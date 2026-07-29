@@ -4,9 +4,9 @@
 
 ## 線上使用
 
-GitHub Pages：https://martinhuang2024.github.io/html-tools/
+GitHub Pages：https://martinhuang2024.github.io/pdf-merger/
 
-網站由 GitHub Actions 自動部署；PDF 與密碼仍只會在瀏覽器本機處理，不會上傳到伺服器。
+網站由獨立公開儲存庫部署；PDF 與密碼仍只會在瀏覽器本機處理，不會上傳到伺服器。
 
 ## 使用方式
 
