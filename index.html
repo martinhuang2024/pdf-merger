@@ -41,7 +41,7 @@
             <path d="M20 15.2A8 8 0 0 1 8.8 4 8 8 0 1 0 20 15.2Z"></path>
           </svg>
         </button>
-        <button class="version-btn" type="button" @click="showChangelog = true">v1.6.2</button>
+        <button class="version-btn" type="button" @click="showChangelog = true">v1.7.0</button>
       </div>
     </header>
 
@@ -108,6 +108,36 @@
             </button>
           </div>
 
+          <div v-if="lockedCount" class="batch-unlock-bar">
+            <label class="batch-select-all">
+              <input
+                type="checkbox"
+                :checked="allLockedSelected"
+                :disabled="isBatchUnlocking"
+                @change="toggleAllLocked"
+              >
+              <span class="batch-check-mark" aria-hidden="true">
+                <svg viewBox="0 0 16 16"><path d="m3 8 3 3 7-7"></path></svg>
+              </span>
+              <span>
+                <strong>全選加密檔案</strong>
+                <small>目前有 {{ lockedCount }} 份待解鎖</small>
+              </span>
+            </label>
+            <button
+              class="batch-unlock-button"
+              type="button"
+              :disabled="!selectedLockedCount || isBatchUnlocking"
+              @click="openBatchUnlockDialog"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M7 11V8a5 5 0 0 1 9.5-2M6 11h12v9H6zM12 14v3"></path>
+              </svg>
+              批次去除密碼
+              <span>{{ selectedLockedCount }}</span>
+            </button>
+          </div>
+
           <ol class="file-list" aria-label="待合併 PDF 清單">
             <li
               v-for="(item, index) in queue"
@@ -132,6 +162,19 @@
                 </span>
               </span>
               <span class="item-actions">
+                <label v-if="item.locked" class="batch-file-check">
+                  <input
+                    v-model="selectedLockedIds"
+                    type="checkbox"
+                    :value="item.id"
+                    :disabled="isBatchUnlocking"
+                    :aria-label="`選取 ${item.file.name} 進行批次解密`"
+                  >
+                  <span class="batch-check-mark" aria-hidden="true">
+                    <svg viewBox="0 0 16 16"><path d="m3 8 3 3 7-7"></path></svg>
+                  </span>
+                  選取
+                </label>
                 <button
                   v-if="!item.locked"
                   class="item-preview-button"
@@ -302,6 +345,67 @@
     </div>
 
     <div
+      v-if="batchUnlockOpen"
+      class="overlay unlock-overlay"
+      @click.self="closeBatchUnlockDialog"
+      @keydown.esc="closeBatchUnlockDialog"
+    >
+      <form
+        class="modal unlock-modal batch-unlock-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="batch-unlock-title"
+        @submit.prevent="unlockSelectedBatch"
+      >
+        <div class="modal-header">
+          <div>
+            <p class="section-label">MULTIPLE ENCRYPTED PDFS</p>
+            <h2 id="batch-unlock-title">批次去除 PDF 密碼</h2>
+          </div>
+          <button class="modal-close" type="button" :disabled="isBatchUnlocking" @click="closeBatchUnlockDialog">關閉</button>
+        </div>
+
+        <div class="batch-unlock-summary">
+          <strong>已選擇 {{ selectedLockedCount }} 份加密 PDF</strong>
+          <small>同一組密碼會依序套用；失敗的檔案會保留勾選。</small>
+        </div>
+        <ul class="batch-unlock-files" aria-label="已選擇的加密 PDF">
+          <li v-for="item in selectedLockedItems" :key="item.id">
+            <span class="pdf-icon" aria-hidden="true">PDF</span>
+            <span>
+              <strong :title="item.file.name">{{ item.file.name }}</strong>
+              <small>{{ formatBytes(item.file.size) }}</small>
+            </span>
+          </li>
+        </ul>
+
+        <label class="unlock-label" for="batch-unlock-password">這批 PDF 的已知密碼</label>
+        <div class="password-field">
+          <input
+            id="batch-unlock-password"
+            ref="batchUnlockPasswordInput"
+            v-model="batchUnlockPassword"
+            :type="showBatchUnlockPassword ? 'text' : 'password'"
+            autocomplete="off"
+            placeholder="輸入共同密碼"
+          >
+          <button type="button" @click="showBatchUnlockPassword = !showBatchUnlockPassword">
+            {{ showBatchUnlockPassword ? '隱藏' : '顯示' }}
+          </button>
+        </div>
+        <p v-if="batchUnlockProgress" class="batch-unlock-progress" role="status">{{ batchUnlockProgress }}</p>
+        <p v-if="batchUnlockError" class="unlock-error" role="alert">{{ batchUnlockError }}</p>
+
+        <div class="unlock-actions">
+          <button class="secondary-button" type="button" :disabled="isBatchUnlocking" @click="closeBatchUnlockDialog">取消</button>
+          <button class="merge-button unlock-submit" type="submit" :disabled="isBatchUnlocking || !selectedLockedCount">
+            {{ isBatchUnlocking ? batchUnlockProgress : `解密 ${selectedLockedCount} 份 PDF` }}
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <div
       v-if="unlockTarget"
       class="overlay unlock-overlay"
       @click.self="closeUnlockDialog"
@@ -363,6 +467,11 @@
             <h2 id="changelog-title">版本紀錄</h2>
           </div>
           <button class="modal-close" type="button" @click="showChangelog = false">關閉</button>
+        </div>
+        <div class="release-entry">
+          <strong>v1.7.0</strong>
+          <span>2026-07-29</span>
+          <p>新增多檔案批次解密；可勾選多份加密 PDF，一次輸入共同密碼依序處理。</p>
         </div>
         <div class="release-entry">
           <strong>v1.6.2</strong>

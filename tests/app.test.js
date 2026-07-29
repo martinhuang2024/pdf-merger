@@ -21,6 +21,7 @@ const {
   summarizeFiles,
   isFileDrag,
   decryptPdfBytes,
+  decryptPdfBatch,
   mergePdfBuffers,
 } = require("../js/app.js");
 
@@ -158,6 +159,38 @@ test("decryptPdfBytes removes a known PDF password", async () => {
   assert.equal(unlockedPdf.getPageCount(), 1);
 });
 
+test("decryptPdfBatch processes files sequentially and keeps individual failures", async () => {
+  const calls = [];
+  let active = 0;
+  let maxActive = 0;
+  const items = [
+    { id: "first", bytes: new Uint8Array([1]) },
+    { id: "second", bytes: new Uint8Array([2]) },
+    { id: "third", bytes: new Uint8Array([3]) },
+  ];
+  const results = await decryptPdfBatch(items, "shared-password", async (bytes, password) => {
+    active += 1;
+    maxActive = Math.max(maxActive, active);
+    calls.push(`${bytes[0]}:${password}`);
+    await new Promise((resolve) => setTimeout(resolve, 2));
+    active -= 1;
+    if (bytes[0] === 2) throw new Error("wrong password");
+    return new Uint8Array([bytes[0], 9]);
+  });
+
+  assert.equal(maxActive, 1);
+  assert.deepEqual(calls, [
+    "1:shared-password",
+    "2:shared-password",
+    "3:shared-password",
+  ]);
+  assert.deepEqual(results.map(({ id, ok }) => ({ id, ok })), [
+    { id: "first", ok: true },
+    { id: "second", ok: false },
+    { id: "third", ok: true },
+  ]);
+});
+
 test("HTML follows the html-tools local asset structure", () => {
   const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
   assert.match(html, /vendor\/vue\.global\.prod\.js/);
@@ -169,10 +202,13 @@ test("HTML follows the html-tools local asset structure", () => {
   assert.match(html, /js\/theme-init\.js/);
   assert.match(html, /css\/styles\.css/);
   assert.match(html, /js\/app\.js/);
-  assert.match(html, /v1\.6\.2/);
+  assert.match(html, /v1\.7\.0/);
   assert.match(html, /class="overlay unlock-overlay"/);
   assert.match(html, /viewport-fit=cover/);
   assert.match(html, />\s*去除密碼\s*</);
+  assert.match(html, />\s*批次去除密碼\s*</);
+  assert.match(html, /v-model="selectedLockedIds"/);
+  assert.match(html, /@submit\.prevent="unlockSelectedBatch"/);
   assert.match(html, />\s*單獨下載\s*</);
   assert.match(html, />\s*預覽\s*</);
   assert.match(html, /預覽合併結果/);

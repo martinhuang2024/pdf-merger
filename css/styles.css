@@ -470,6 +470,128 @@ main {
   font-size: 13px;
 }
 
+.batch-unlock-bar {
+  display: flex;
+  min-height: 78px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.batch-select-all,
+.batch-file-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.batch-select-all input,
+.batch-file-check input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.batch-check-mark {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--ink);
+  background: transparent;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+
+.batch-check-mark svg {
+  width: 13px;
+  fill: none;
+  stroke: var(--on-accent);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+  opacity: 0;
+  transform: scale(0.65);
+  transition: opacity 150ms ease, transform 150ms ease;
+}
+
+.batch-select-all input:checked + .batch-check-mark,
+.batch-file-check input:checked + .batch-check-mark {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.batch-select-all input:checked + .batch-check-mark svg,
+.batch-file-check input:checked + .batch-check-mark svg {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.batch-select-all input:focus-visible + .batch-check-mark,
+.batch-file-check input:focus-visible + .batch-check-mark {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+.batch-select-all > span:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.batch-select-all strong {
+  font-size: 13px;
+}
+
+.batch-select-all small {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.batch-unlock-button {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 14px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.batch-unlock-button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.batch-unlock-button svg {
+  width: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+
+.batch-unlock-button > span {
+  display: grid;
+  min-width: 20px;
+  height: 20px;
+  place-items: center;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font-family: "DM Mono", monospace;
+  font-size: 9px;
+}
+
 .text-button {
   display: inline-flex;
   align-items: center;
@@ -632,6 +754,20 @@ main {
   display: flex;
   align-items: center;
   gap: 3px;
+}
+
+.batch-file-check {
+  min-height: 36px;
+  margin-right: 5px;
+  padding: 0 8px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.batch-file-check .batch-check-mark {
+  width: 18px;
+  height: 18px;
 }
 
 .unlock-action-button {
@@ -1364,6 +1500,80 @@ footer {
   font-size: 10px;
 }
 
+.batch-unlock-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 22px 0 12px;
+}
+
+.batch-unlock-summary strong {
+  font-size: 14px;
+}
+
+.batch-unlock-summary small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.batch-unlock-files {
+  max-height: 168px;
+  margin: 0 0 22px;
+  padding: 0;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  list-style: none;
+}
+
+.batch-unlock-files li {
+  display: grid;
+  grid-template-columns: 31px minmax(0, 1fr);
+  align-items: center;
+  gap: 11px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.batch-unlock-files li:last-child {
+  border-bottom: 0;
+}
+
+.batch-unlock-files .pdf-icon {
+  width: 30px;
+  height: 36px;
+  padding-bottom: 5px;
+  font-size: 7px;
+}
+
+.batch-unlock-files li > span:last-child {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.batch-unlock-files strong {
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.batch-unlock-files small {
+  color: var(--muted);
+  font-family: "DM Mono", monospace;
+  font-size: 9px;
+}
+
+.batch-unlock-progress {
+  min-height: 20px;
+  margin: 10px 0 0;
+  color: var(--green);
+  font-size: 12px;
+}
+
 .unlock-label {
   display: block;
   margin-bottom: 8px;
@@ -1549,6 +1759,18 @@ footer {
     font-size: 11px;
   }
 
+  .batch-unlock-bar {
+    gap: 12px;
+  }
+
+  .batch-select-all small {
+    display: none;
+  }
+
+  .batch-unlock-button {
+    padding-inline: 11px;
+  }
+
   .file-item {
     grid-template-columns: 28px 38px 1fr;
     gap: 11px;
@@ -1585,10 +1807,14 @@ footer {
     padding-bottom: 12px;
   }
 
+  .batch-file-check {
+    margin-right: auto;
+    padding-left: 0;
+  }
+
   .unlock-action-button {
     width: auto;
     min-height: 38px;
-    margin-right: auto;
     padding: 0 12px;
     justify-content: center;
     font-size: 11px;
@@ -1728,6 +1954,29 @@ footer {
     box-shadow: 5px 5px 0 var(--shadow-solid);
   }
 
+  .batch-unlock-bar {
+    min-height: 72px;
+    flex-wrap: wrap;
+    padding-block: 12px;
+  }
+
+  .batch-select-all {
+    gap: 8px;
+  }
+
+  .batch-select-all strong {
+    font-size: 12px;
+  }
+
+  .batch-unlock-button {
+    min-height: 44px;
+    flex: 1 1 170px;
+  }
+
+  .batch-file-check {
+    min-height: 38px;
+  }
+
   .unlock-modal .modal-header {
     gap: 12px;
     padding-bottom: 14px;
@@ -1751,6 +2000,27 @@ footer {
     gap: 12px;
     margin: 16px 0 18px;
     padding: 12px;
+  }
+
+  .batch-unlock-summary {
+    margin: 14px 0 9px;
+  }
+
+  .batch-unlock-summary strong {
+    font-size: 13px;
+  }
+
+  .batch-unlock-summary small {
+    font-size: 10px;
+  }
+
+  .batch-unlock-files {
+    max-height: 126px;
+    margin-bottom: 15px;
+  }
+
+  .batch-unlock-files li {
+    padding: 8px 10px;
   }
 
   .unlock-file-preview .pdf-icon {
@@ -1823,6 +2093,19 @@ footer {
   .unlock-file-preview {
     margin-block: 12px;
     padding-block: 9px;
+  }
+
+  .batch-unlock-summary {
+    margin: 10px 0 7px;
+  }
+
+  .batch-unlock-summary small {
+    display: none;
+  }
+
+  .batch-unlock-files {
+    max-height: 82px;
+    margin-bottom: 10px;
   }
 
   .unlock-error {

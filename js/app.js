@@ -136,6 +136,23 @@
     }
   }
 
+  async function decryptPdfBatch(items, password, decryptor) {
+    const decrypt = decryptor || decryptPdfBytes;
+    const results = [];
+    for (const item of items || []) {
+      try {
+        results.push({
+          id: item.id,
+          ok: true,
+          bytes: await decrypt(item.bytes, password),
+        });
+      } catch (error) {
+        results.push({ id: item.id, ok: false, error });
+      }
+    }
+    return results;
+  }
+
   function isEncryptedPdfError(error) {
     return Boolean(
       error &&
@@ -182,6 +199,7 @@
     summarizeFiles,
     isFileDrag,
     decryptPdfBytes,
+    decryptPdfBatch,
     isEncryptedPdfError,
     mergePdfBuffers,
   };
@@ -202,6 +220,7 @@
       const isReading = ref(false);
       const isBusy = ref(false);
       const isUnlocking = ref(false);
+      const isBatchUnlocking = ref(false);
       const isPreviewing = ref(false);
       const draggedId = ref(null);
       const toastMessage = ref("");
@@ -212,6 +231,13 @@
       const unlockPasswordInput = ref(null);
       const showUnlockPassword = ref(false);
       const unlockError = ref("");
+      const selectedLockedIds = ref([]);
+      const batchUnlockOpen = ref(false);
+      const batchUnlockPassword = ref("");
+      const batchUnlockPasswordInput = ref(null);
+      const showBatchUnlockPassword = ref(false);
+      const batchUnlockError = ref("");
+      const batchUnlockProgress = ref("");
       const previewUrl = ref("");
       const previewTitle = ref("");
       const previewPageCount = ref(0);
@@ -227,6 +253,13 @@
       const summary = computed(() => summarizeFiles(queue.value));
       const lockedCount = computed(() => queue.value.filter((item) => item.locked).length);
       const hasLockedFiles = computed(() => lockedCount.value > 0);
+      const selectedLockedItems = computed(() => queue.value.filter(
+        (item) => item.locked && selectedLockedIds.value.includes(item.id)
+      ));
+      const selectedLockedCount = computed(() => selectedLockedItems.value.length);
+      const allLockedSelected = computed(() => (
+        lockedCount.value > 0 && selectedLockedCount.value === lockedCount.value
+      ));
       const isDarkMode = computed(() => theme.value === "dark");
 
       function showToast(message, type) {
@@ -297,7 +330,10 @@
         } else {
           const encryptedCount = accepted.filter((item) => item.locked).length;
           if (encryptedCount) {
-            showToast(`已顯示 ${accepted.length} 份 PDF，其中 ${encryptedCount} 份已加密。請按「去除密碼」。`, "success");
+            showToast(
+              `已顯示 ${accepted.length} 份 PDF，其中 ${encryptedCount} 份已加密。可單檔解密或勾選後批次處理。`,
+              "success"
+            );
           } else if (files.length !== pdfFiles.length) {
             showToast("已加入 PDF，並略過非 PDF 格式的檔案。", "success");
           } else {
@@ -342,11 +378,15 @@
       function moveBy(index, direction) { queue.value = moveItem(queue.value, index, index + direction); }
       function removeFile(id) {
         if (unlockTarget.value && unlockTarget.value.id === id) closeUnlockDialog();
+        selectedLockedIds.value = selectedLockedIds.value.filter((selectedId) => selectedId !== id);
         queue.value = queue.value.filter((item) => item.id !== id);
+        if (batchUnlockOpen.value && !selectedLockedCount.value) closeBatchUnlockDialog();
       }
       function clearAll() {
         closeUnlockDialog();
+        closeBatchUnlockDialog();
         closePreview();
+        selectedLockedIds.value = [];
         queue.value = [];
       }
 
@@ -365,6 +405,34 @@
         unlockTarget.value = null;
         unlockPassword.value = "";
         unlockError.value = "";
+      }
+
+      function toggleAllLocked(event) {
+        if (event && event.target && event.target.checked) {
+          selectedLockedIds.value = queue.value.filter((item) => item.locked).map((item) => item.id);
+        } else {
+          selectedLockedIds.value = [];
+        }
+      }
+
+      function openBatchUnlockDialog() {
+        if (!selectedLockedCount.value || isBatchUnlocking.value) return;
+        batchUnlockOpen.value = true;
+        batchUnlockPassword.value = "";
+        showBatchUnlockPassword.value = false;
+        batchUnlockError.value = "";
+        batchUnlockProgress.value = "";
+        nextTick(() => {
+          if (batchUnlockPasswordInput.value) batchUnlockPasswordInput.value.focus();
+        });
+      }
+
+      function closeBatchUnlockDialog() {
+        if (isBatchUnlocking.value) return;
+        batchUnlockOpen.value = false;
+        batchUnlockPassword.value = "";
+        batchUnlockError.value = "";
+        batchUnlockProgress.value = "";
       }
 
       async function unlockSelected() {
@@ -395,6 +463,7 @@
               }
               : item
           ));
+          selectedLockedIds.value = selectedLockedIds.value.filter((id) => id !== target.id);
           const filename = target.file.name;
           isUnlocking.value = false;
           closeUnlockDialog();
@@ -406,6 +475,82 @@
         } finally {
           isUnlocking.value = false;
         }
+      }
+
+      async function unlockSelectedBatch() {
+        const targets = [...selectedLockedItems.value];
+        if (!targets.length || isBatchUnlocking.value) return;
+        if (!batchUnlockPassword.value) {
+          batchUnlockError.value = "請輸入這批 PDF 的已知密碼。";
+          if (batchUnlockPasswordInput.value) batchUnlockPasswordInput.value.focus();
+          return;
+        }
+
+        isBatchUnlocking.value = true;
+        batchUnlockError.value = "";
+        batchUnlockProgress.value = `正在處理 1 / ${targets.length}`;
+        const password = batchUnlockPassword.value;
+        let processedCount = 0;
+        const results = await decryptPdfBatch(targets, password, async (bytes, knownPassword) => {
+          batchUnlockProgress.value = `正在處理 ${processedCount + 1} / ${targets.length}`;
+          try {
+            return await decryptPdfBytes(bytes, knownPassword);
+          } finally {
+            processedCount += 1;
+          }
+        });
+
+        const successful = new Map();
+        const failedIds = [];
+        for (const result of results) {
+          if (!result.ok) {
+            failedIds.push(result.id);
+            continue;
+          }
+          try {
+            const pdf = await root.PDFLib.PDFDocument.load(result.bytes, {
+              ignoreEncryption: false,
+              updateMetadata: false,
+            });
+            successful.set(result.id, {
+              bytes: result.bytes,
+              pageCount: pdf.getPageCount(),
+            });
+          } catch {
+            failedIds.push(result.id);
+          }
+        }
+
+        queue.value = queue.value.map((item) => {
+          const unlocked = successful.get(item.id);
+          return unlocked
+            ? {
+              ...item,
+              bytes: unlocked.bytes,
+              pageCount: unlocked.pageCount,
+              locked: false,
+              unlocked: true,
+            }
+            : item;
+        });
+        selectedLockedIds.value = failedIds;
+        isBatchUnlocking.value = false;
+        batchUnlockProgress.value = "";
+
+        if (!failedIds.length) {
+          const count = successful.size;
+          closeBatchUnlockDialog();
+          showToast(`已批次去除 ${count} 份 PDF 的密碼。`, "success");
+          return;
+        }
+
+        batchUnlockPassword.value = "";
+        batchUnlockError.value = successful.size
+          ? `已完成 ${successful.size} 份；另有 ${failedIds.length} 份密碼不同或不支援，已保留勾選。`
+          : `這 ${failedIds.length} 份 PDF 的密碼錯誤或不支援，請重新確認。`;
+        nextTick(() => {
+          if (batchUnlockPasswordInput.value) batchUnlockPasswordInput.value.focus();
+        });
       }
 
       function downloadUnlocked(item) {
@@ -606,11 +751,15 @@
 
       return {
         queue, fileInput, outputName, normalizeOrientation, pageOrientation,
-        dragActive, isReading, isBusy, isUnlocking, isPreviewing, draggedId,
+        dragActive, isReading, isBusy, isUnlocking, isBatchUnlocking, isPreviewing, draggedId,
         toastMessage, toastType, showChangelog, unlockTarget, unlockPassword, unlockPasswordInput,
         showUnlockPassword, unlockError, theme, isDarkMode, summary, lockedCount, hasLockedFiles,
+        selectedLockedIds, batchUnlockOpen, batchUnlockPassword, batchUnlockPasswordInput,
+        showBatchUnlockPassword, batchUnlockError, batchUnlockProgress,
+        selectedLockedCount, selectedLockedItems, allLockedSelected,
         previewUrl, previewTitle, previewPageCount, previewContainer, previewLoading, previewError,
         formatBytes, openFilePicker, toggleTheme, openUnlockDialog, closeUnlockDialog, unlockSelected,
+        toggleAllLocked, openBatchUnlockDialog, closeBatchUnlockDialog, unlockSelectedBatch,
         handleFileInput, moveBy, removeFile, clearAll, downloadUnlocked,
         openPreview, closePreview, previewItem, previewMerged, startDrag, endDrag,
         dropAt, mergeAndDownload,
