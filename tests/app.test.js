@@ -161,7 +161,9 @@ test("HTML follows the html-tools local asset structure", () => {
   assert.match(html, /js\/theme-init\.js/);
   assert.match(html, /css\/styles\.css/);
   assert.match(html, /js\/app\.js/);
-  assert.match(html, /v1\.6\.0/);
+  assert.match(html, /v1\.6\.1/);
+  assert.match(html, /class="overlay unlock-overlay"/);
+  assert.match(html, /viewport-fit=cover/);
   assert.match(html, />\s*去除密碼\s*</);
   assert.match(html, />\s*單獨下載\s*</);
   assert.match(html, />\s*預覽\s*</);

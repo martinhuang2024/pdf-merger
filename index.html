@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="description" content="在瀏覽器本機排序並合併多個 PDF，檔案不會上傳。">
   <title>合頁 · PDF 合併工具</title>
   <script src="js/theme-init.js"></script>
@@ -41,7 +41,7 @@
             <path d="M20 15.2A8 8 0 0 1 8.8 4 8 8 0 1 0 20 15.2Z"></path>
           </svg>
         </button>
-        <button class="version-btn" type="button" @click="showChangelog = true">v1.6.0</button>
+        <button class="version-btn" type="button" @click="showChangelog = true">v1.6.1</button>
       </div>
     </header>
 
@@ -307,7 +307,7 @@
 
     <div
       v-if="unlockTarget"
-      class="overlay"
+      class="overlay unlock-overlay"
       @click.self="closeUnlockDialog"
       @keydown.esc="closeUnlockDialog"
     >
@@ -367,6 +367,11 @@
             <h2 id="changelog-title">版本紀錄</h2>
           </div>
           <button class="modal-close" type="button" @click="showChangelog = false">關閉</button>
+        </div>
+        <div class="release-entry">
+          <strong>v1.6.1</strong>
+          <span>2026-07-29</span>
+          <p>優化 5.4 吋手機的解密排版，鍵盤開啟時密碼欄與操作按鈕仍可捲動操作。</p>
         </div>
         <div class="release-entry">
           <strong>v1.6.0</strong>

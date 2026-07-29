@@ -34,6 +34,12 @@ GitHub Pages：https://martinhuang2024.github.io/pdf-merger/
 
 ## 版本
 
+### v1.6.1
+
+- 優化 iPhone 12 mini 等 5.4 吋手機的解密排版。
+- 密碼鍵盤開啟時，解密視窗可捲動且操作按鈕維持可見。
+- 手機版保留完整「去除密碼」按鈕文字，檔名最多顯示兩行。
+
 ### v1.6.0
 
 - 新增單檔 PDF 預覽。

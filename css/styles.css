@@ -1205,6 +1205,11 @@ footer {
 
 .unlock-modal {
   width: min(520px, 100%);
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .preview-overlay {
@@ -1581,11 +1586,12 @@ footer {
   }
 
   .unlock-action-button {
-    width: 34px;
-    padding: 0;
+    width: auto;
+    min-height: 38px;
+    margin-right: auto;
+    padding: 0 12px;
     justify-content: center;
-    overflow: hidden;
-    font-size: 0;
+    font-size: 11px;
   }
 
   .unlock-action-button svg {
@@ -1696,6 +1702,136 @@ footer {
 
   .toast {
     min-width: 0;
+  }
+}
+
+@media (max-width: 430px) {
+  .page-shell {
+    width: min(100% - 24px, 1180px);
+  }
+
+  .unlock-overlay {
+    padding:
+      max(10px, env(safe-area-inset-top))
+      10px
+      max(10px, env(safe-area-inset-bottom));
+    overflow-y: auto;
+    place-items: center;
+    scroll-padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+
+  .unlock-modal {
+    width: 100%;
+    max-height: calc(100vh - 20px);
+    max-height: calc(100dvh - 20px);
+    padding: 18px;
+    box-shadow: 5px 5px 0 var(--shadow-solid);
+  }
+
+  .unlock-modal .modal-header {
+    gap: 12px;
+    padding-bottom: 14px;
+  }
+
+  .unlock-modal .modal-header h2 {
+    margin-top: 5px;
+    font-size: 22px;
+    line-height: 1.2;
+  }
+
+  .unlock-modal .modal-close {
+    min-width: 52px;
+    min-height: 44px;
+    padding: 0 10px;
+    flex: 0 0 auto;
+  }
+
+  .unlock-file-preview {
+    grid-template-columns: 36px minmax(0, 1fr);
+    gap: 12px;
+    margin: 16px 0 18px;
+    padding: 12px;
+  }
+
+  .unlock-file-preview .pdf-icon {
+    width: 34px;
+    height: 42px;
+  }
+
+  .unlock-file-preview strong {
+    display: -webkit-box;
+    overflow: hidden;
+    font-size: 13px;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+    white-space: normal;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .unlock-file-preview small {
+    font-size: 9px;
+  }
+
+  .unlock-label {
+    margin-bottom: 6px;
+  }
+
+  .password-field input {
+    min-height: 48px;
+    padding: 10px 0;
+    font-size: 16px;
+  }
+
+  .password-field button {
+    min-width: 54px;
+    min-height: 48px;
+    padding-left: 12px;
+  }
+
+  .unlock-actions {
+    position: sticky;
+    bottom: -18px;
+    display: grid;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    gap: 8px;
+    margin: 16px -18px -18px;
+    padding: 12px 18px max(18px, env(safe-area-inset-bottom));
+    border-top: 1px solid var(--line);
+    background: var(--paper);
+  }
+
+  .unlock-actions .secondary-button,
+  .unlock-actions .merge-button {
+    width: 100%;
+    min-width: 0;
+    min-height: 48px;
+    padding-inline: 10px;
+  }
+}
+
+@media (max-width: 430px) and (max-height: 620px) {
+  .unlock-modal .section-label {
+    display: none;
+  }
+
+  .unlock-modal .modal-header h2 {
+    margin-top: 0;
+  }
+
+  .unlock-file-preview {
+    margin-block: 12px;
+    padding-block: 9px;
+  }
+
+  .unlock-error {
+    margin-top: 6px;
+  }
+
+  .unlock-actions {
+    margin-top: 12px;
+    padding-top: 9px;
   }
 }
 
