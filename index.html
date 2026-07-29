@@ -41,7 +41,7 @@
             <path d="M20 15.2A8 8 0 0 1 8.8 4 8 8 0 1 0 20 15.2Z"></path>
           </svg>
         </button>
-        <button class="version-btn" type="button" @click="showChangelog = true">v1.6.1</button>
+        <button class="version-btn" type="button" @click="showChangelog = true">v1.6.2</button>
       </div>
     </header>
 
@@ -78,10 +78,6 @@
           for="file-input"
           @keydown.enter.prevent="openFilePicker"
           @keydown.space.prevent="openFilePicker"
-          @dragenter.prevent="dragActive = true"
-          @dragover.prevent="dragActive = true"
-          @dragleave.prevent="dragActive = false"
-          @drop.prevent="handleDrop"
         >
           <div class="drop-art" aria-hidden="true">
             <span class="paper paper-back"></span>
@@ -367,6 +363,11 @@
             <h2 id="changelog-title">版本紀錄</h2>
           </div>
           <button class="modal-close" type="button" @click="showChangelog = false">關閉</button>
+        </div>
+        <div class="release-entry">
+          <strong>v1.6.2</strong>
+          <span>2026-07-29</span>
+          <p>整個頁面都可拖入 PDF；已有檔案清單時也能直接拖放追加。</p>
         </div>
         <div class="release-entry">
           <strong>v1.6.1</strong>

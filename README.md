@@ -34,6 +34,12 @@ GitHub Pages：https://martinhuang2024.github.io/pdf-merger/
 
 ## 版本
 
+### v1.6.2
+
+- 整個頁面都能拖入 PDF。
+- 已有檔案清單時，可直接拖放追加更多 PDF。
+- 外部檔案拖入不會干擾清單內的排序拖曳。
+
 ### v1.6.1
 
 - 優化 iPhone 12 mini 等 5.4 吋手機的解密排版。

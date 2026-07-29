@@ -51,6 +51,11 @@
     };
   }
 
+  function isFileDrag(dataTransfer) {
+    return Array.from((dataTransfer && dataTransfer.types) || [])
+      .some((type) => String(type).toLowerCase() === "files");
+  }
+
   let qpdfPromise = null;
   let qpdfWasmUrl = "";
   let qpdfOutput = [];
@@ -175,6 +180,7 @@
     getTargetRotation,
     moveItem,
     summarizeFiles,
+    isFileDrag,
     decryptPdfBytes,
     isEncryptedPdfError,
     mergePdfBuffers,
@@ -183,7 +189,7 @@
   root.PdfMergerUtils = utils;
   if (!root.Vue || !root.PDFLib || typeof document === "undefined") return;
 
-  const { createApp, ref, computed, nextTick, onBeforeUnmount } = root.Vue;
+  const { createApp, ref, computed, nextTick, onMounted, onBeforeUnmount } = root.Vue;
 
   createApp({
     setup() {
@@ -269,7 +275,7 @@
       }
 
       async function addFiles(fileList) {
-        if (isBusy.value) return;
+        if (isBusy.value || isReading.value) return;
         const files = Array.from(fileList || []);
         const pdfFiles = files.filter((file) => file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf"));
         if (!pdfFiles.length) {
@@ -301,10 +307,38 @@
       }
 
       function handleFileInput(event) { addFiles(event.target.files); }
-      function handleDrop(event) {
+
+      function handlePageDragEnter(event) {
+        if (!isFileDrag(event.dataTransfer)) return;
+        event.preventDefault();
+        dragActive.value = !isBusy.value && !isReading.value;
+      }
+
+      function handlePageDragOver(event) {
+        if (!isFileDrag(event.dataTransfer)) return;
+        event.preventDefault();
+        if (event.dataTransfer) {
+          event.dataTransfer.dropEffect = isBusy.value || isReading.value ? "none" : "copy";
+        }
+        dragActive.value = !isBusy.value && !isReading.value;
+      }
+
+      function handlePageDragLeave(event) {
+        if (!dragActive.value) return;
+        if (event.relatedTarget && document.documentElement.contains(event.relatedTarget)) return;
+        dragActive.value = false;
+      }
+
+      function handlePageDrop(event) {
+        if (!isFileDrag(event.dataTransfer)) return;
+        event.preventDefault();
+        event.stopPropagation();
         dragActive.value = false;
         addFiles(event.dataTransfer.files);
       }
+
+      function resetPageDrag() { dragActive.value = false; }
+
       function moveBy(index, direction) { queue.value = moveItem(queue.value, index, index + direction); }
       function removeFile(id) {
         if (unlockTarget.value && unlockTarget.value.id === id) closeUnlockDialog();
@@ -553,7 +587,22 @@
         }
       }
 
-      onBeforeUnmount(closePreview);
+      onMounted(() => {
+        document.addEventListener("dragenter", handlePageDragEnter);
+        document.addEventListener("dragover", handlePageDragOver);
+        document.addEventListener("dragleave", handlePageDragLeave);
+        document.addEventListener("drop", handlePageDrop);
+        window.addEventListener("blur", resetPageDrag);
+      });
+
+      onBeforeUnmount(() => {
+        closePreview();
+        document.removeEventListener("dragenter", handlePageDragEnter);
+        document.removeEventListener("dragover", handlePageDragOver);
+        document.removeEventListener("dragleave", handlePageDragLeave);
+        document.removeEventListener("drop", handlePageDrop);
+        window.removeEventListener("blur", resetPageDrag);
+      });
 
       return {
         queue, fileInput, outputName, normalizeOrientation, pageOrientation,
@@ -562,7 +611,7 @@
         showUnlockPassword, unlockError, theme, isDarkMode, summary, lockedCount, hasLockedFiles,
         previewUrl, previewTitle, previewPageCount, previewContainer, previewLoading, previewError,
         formatBytes, openFilePicker, toggleTheme, openUnlockDialog, closeUnlockDialog, unlockSelected,
-        handleFileInput, handleDrop, moveBy, removeFile, clearAll, downloadUnlocked,
+        handleFileInput, moveBy, removeFile, clearAll, downloadUnlocked,
         openPreview, closePreview, previewItem, previewMerged, startDrag, endDrag,
         dropAt, mergeAndDownload,
       };

@@ -19,6 +19,7 @@ const {
   getTargetRotation,
   moveItem,
   summarizeFiles,
+  isFileDrag,
   decryptPdfBytes,
   mergePdfBuffers,
 } = require("../js/app.js");
@@ -65,6 +66,13 @@ test("summarizeFiles totals files, pages, and bytes", () => {
     ]),
     { files: 2, pages: 5, bytes: 350 }
   );
+});
+
+test("isFileDrag distinguishes external files from internal queue dragging", () => {
+  assert.equal(isFileDrag({ types: ["Files"] }), true);
+  assert.equal(isFileDrag({ types: ["text/plain", "Files"] }), true);
+  assert.equal(isFileDrag({ types: ["text/plain"] }), false);
+  assert.equal(isFileDrag(null), false);
 });
 
 test("resolveTheme keeps a saved choice and otherwise follows the device", () => {
@@ -161,7 +169,7 @@ test("HTML follows the html-tools local asset structure", () => {
   assert.match(html, /js\/theme-init\.js/);
   assert.match(html, /css\/styles\.css/);
   assert.match(html, /js\/app\.js/);
-  assert.match(html, /v1\.6\.1/);
+  assert.match(html, /v1\.6\.2/);
   assert.match(html, /class="overlay unlock-overlay"/);
   assert.match(html, /viewport-fit=cover/);
   assert.match(html, />\s*去除密碼\s*</);
@@ -178,5 +186,15 @@ test("HTML follows the html-tools local asset structure", () => {
     html,
     /<section class="workspace"[\s\S]*?<input[\s\S]*?ref="fileInput"[\s\S]*?<label[\s\S]*?v-if="!queue\.length"/
   );
+  assert.doesNotMatch(html, /@drop\.prevent="handleDrop"/);
   assert.doesNotMatch(html, /https?:\/\//);
+});
+
+test("whole page registers and removes external PDF drag listeners", () => {
+  const source = fs.readFileSync(path.join(__dirname, "..", "js", "app.js"), "utf8");
+  assert.match(source, /document\.addEventListener\("dragenter", handlePageDragEnter\)/);
+  assert.match(source, /document\.addEventListener\("dragover", handlePageDragOver\)/);
+  assert.match(source, /document\.addEventListener\("drop", handlePageDrop\)/);
+  assert.match(source, /document\.removeEventListener\("drop", handlePageDrop\)/);
+  assert.match(source, /addFiles\(event\.dataTransfer\.files\)/);
 });
