@@ -2,6 +2,12 @@
 
 一個完全在瀏覽器本機運作的多 PDF 合併工具。可加入多份 PDF、使用已知密碼解鎖、查看頁數與大小、調整順序、設定下載檔名並合併下載，並支援深色模式。
 
+## 線上使用
+
+GitHub Pages：https://martinhuang2024.github.io/html-tools/
+
+網站由 GitHub Actions 自動部署；PDF 與密碼仍只會在瀏覽器本機處理，不會上傳到伺服器。
+
 ## 使用方式
 
 直接開啟 `index.html`：
