@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="在瀏覽器本機排序並合併多個 PDF，檔案不會上傳。">
+  <title>合頁 · PDF 合併工具</title>
+  <script src="js/theme-init.js"></script>
+  <link rel="stylesheet" href="css/styles.css">
+  <script src="vendor/vue.global.prod.js"></script>
+  <script src="vendor/pdf-lib.min.js"></script>
+  <script src="vendor/pdf.worker.min.js"></script>
+  <script src="vendor/pdf.min.js"></script>
+  <script src="vendor/qpdf-wasm-base64.js"></script>
+  <script src="vendor/qpdf.js"></script>
+</head>
+<body>
+  <div id="app" class="page-shell" v-cloak>
+    <header class="topbar">
+      <a class="brand" href="#" aria-label="合頁首頁">
+        <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+        <span>合頁</span>
+      </a>
+      <div class="top-actions">
+        <div class="privacy-note">
+          <span class="privacy-dot" aria-hidden="true"></span>
+          僅在你的裝置處理
+        </div>
+        <button
+          class="theme-toggle"
+          type="button"
+          :aria-label="isDarkMode ? '切換為淺色模式' : '切換為深色模式'"
+          :title="isDarkMode ? '切換為淺色模式' : '切換為深色模式'"
+          @click="toggleTheme"
+        >
+          <svg v-if="isDarkMode" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="4"></circle>
+            <path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path>
+          </svg>
+          <svg v-else viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M20 15.2A8 8 0 0 1 8.8 4 8 8 0 1 0 20 15.2Z"></path>
+          </svg>
+        </button>
+        <button class="version-btn" type="button" @click="showChangelog = true">v1.6.0</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="intro" aria-labelledby="page-title">
+        <p class="eyebrow">HTML TOOLS / PDF MERGE DESK</p>
+        <h1 id="page-title">把散落的頁面，<br>整理成一份文件。</h1>
+        <p class="intro-copy">
+          加入多個 PDF、排好順序，然後一次合併下載。<br class="desktop-only">
+          不需註冊，檔案也不會離開這個瀏覽器。
+        </p>
+      </section>
+
+      <section class="workspace" aria-label="PDF 合併工作區">
+        <input
+          id="file-input"
+          ref="fileInput"
+          class="file-input-native"
+          type="file"
+          accept=".pdf,application/pdf"
+          multiple
+          aria-hidden="true"
+          tabindex="-1"
+          @change="handleFileInput"
+        >
+
+        <label
+          v-if="!queue.length"
+          id="drop-zone"
+          class="drop-zone"
+          :class="{ 'is-over': dragActive, 'is-reading': isReading }"
+          tabindex="0"
+          aria-label="選擇或拖曳 PDF 檔案"
+          for="file-input"
+          @keydown.enter.prevent="openFilePicker"
+          @keydown.space.prevent="openFilePicker"
+          @dragenter.prevent="dragActive = true"
+          @dragover.prevent="dragActive = true"
+          @dragleave.prevent="dragActive = false"
+          @drop.prevent="handleDrop"
+        >
+          <div class="drop-art" aria-hidden="true">
+            <span class="paper paper-back"></span>
+            <span class="paper paper-mid"></span>
+            <span class="paper paper-front">
+              <svg viewBox="0 0 24 24"><path d="M12 16V5m0 0L8 9m4-4 4 4M5 15v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"></path></svg>
+            </span>
+          </div>
+          <div class="drop-copy">
+            <strong>{{ isReading ? '正在讀取 PDF…' : '把 PDF 放到這裡' }}</strong>
+            <span>或點一下選擇檔案</span>
+          </div>
+          <span class="drop-format">PDF · 可多選</span>
+        </label>
+
+        <div v-else class="queue-panel">
+          <div class="queue-header">
+            <div>
+              <p class="section-label">合併順序</p>
+              <p class="queue-summary" aria-live="polite">
+                {{ summary.files }} 份文件 · {{ summary.pages }} 頁 · {{ formatBytes(summary.bytes) }}
+                <template v-if="lockedCount"> · {{ lockedCount }} 份待解鎖</template>
+              </p>
+            </div>
+            <button class="text-button" type="button" :disabled="isBusy" @click="openFilePicker">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+              加入 PDF
+            </button>
+          </div>
+
+          <ol class="file-list" aria-label="待合併 PDF 清單">
+            <li
+              v-for="(item, index) in queue"
+              :key="item.id"
+              class="file-item"
+              :class="{ 'is-dragging': draggedId === item.id, 'is-locked': item.locked }"
+              draggable="true"
+              @dragstart="startDrag(item.id, $event)"
+              @dragend="endDrag"
+              @dragover.prevent
+              @drop.prevent="dropAt(item.id, $event)"
+            >
+              <span class="drag-handle" title="拖曳調整順序" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span>
+              <span class="order-number">{{ String(index + 1).padStart(2, '0') }}</span>
+              <span class="pdf-icon" aria-hidden="true">PDF</span>
+              <span class="file-info">
+                <strong :title="item.file.name">{{ item.file.name }}</strong>
+                <span class="file-meta">
+                  <template v-if="!item.locked">{{ item.pageCount }} 頁 · </template>{{ formatBytes(item.file.size) }}
+                  <em v-if="item.locked" class="locked-badge">已加密</em>
+                  <em v-if="item.unlocked" class="unlock-badge">已去除密碼</em>
+                </span>
+              </span>
+              <span class="item-actions">
+                <button
+                  v-if="!item.locked"
+                  class="item-preview-button"
+                  type="button"
+                  :aria-label="`預覽 ${item.file.name}`"
+                  @click="previewItem(item)"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"></path>
+                    <circle cx="12" cy="12" r="2.5"></circle>
+                  </svg>
+                  預覽
+                </button>
+                <button
+                  v-if="item.locked"
+                  class="unlock-action-button"
+                  type="button"
+                  @click="openUnlockDialog(item)"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M7 11V8a5 5 0 0 1 9.5-2M6 11h12v9H6zM12 14v3"></path>
+                  </svg>
+                  去除密碼
+                </button>
+                <button
+                  v-if="item.unlocked"
+                  class="single-download-button"
+                  type="button"
+                  :aria-label="`單獨下載 ${item.file.name} 的已解密版本`"
+                  title="單獨下載已解密版本"
+                  @click="downloadUnlocked(item)"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 4v10m0 0 4-4m-4 4-4-4M5 19h14"></path>
+                  </svg>
+                  單獨下載
+                </button>
+                <button class="icon-button" type="button" :disabled="index === 0" :aria-label="`將 ${item.file.name} 上移`" @click="moveBy(index, -1)">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 14 5-5 5 5"></path></svg>
+                </button>
+                <button class="icon-button" type="button" :disabled="index === queue.length - 1" :aria-label="`將 ${item.file.name} 下移`" @click="moveBy(index, 1)">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"></path></svg>
+                </button>
+                <button class="icon-button" type="button" :aria-label="`移除 ${item.file.name}`" @click="removeFile(item.id)">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M9 7V4h6v3m2 0-1 13H8L7 7m3 4v5m4-5v5"></path></svg>
+                </button>
+              </span>
+            </li>
+          </ol>
+
+          <div class="orientation-row">
+            <label class="orientation-master">
+              <input v-model="normalizeOrientation" type="checkbox">
+              <span class="check-mark" aria-hidden="true">
+                <svg viewBox="0 0 16 16"><path d="m3 8 3 3 7-7"></path></svg>
+              </span>
+              <span>
+                <strong>統一頁面方向</strong>
+                <small>未勾選時保留原始直橫混合</small>
+              </span>
+            </label>
+
+            <fieldset class="orientation-options" :disabled="!normalizeOrientation">
+              <legend class="sr-only">選擇統一頁面方向</legend>
+              <label>
+                <input v-model="pageOrientation" type="radio" value="portrait">
+                <span class="page-shape is-portrait" aria-hidden="true"></span>
+                直向
+              </label>
+              <label>
+                <input v-model="pageOrientation" type="radio" value="landscape">
+                <span class="page-shape is-landscape" aria-hidden="true"></span>
+                橫向
+              </label>
+            </fieldset>
+          </div>
+
+          <div class="output-row">
+            <label for="output-name">下載檔名</label>
+            <div class="filename-field">
+              <input id="output-name" v-model="outputName" type="text" maxlength="80">
+              <span>.pdf</span>
+            </div>
+          </div>
+
+          <div class="action-row">
+            <button class="secondary-button" type="button" :disabled="isBusy" @click="clearAll">全部清除</button>
+            <button
+              class="preview-merge-button"
+              type="button"
+              :class="{ 'is-loading': isPreviewing }"
+              :disabled="isBusy || isPreviewing || hasLockedFiles"
+              @click="previewMerged"
+            >
+              <span class="preview-label">
+                {{ hasLockedFiles ? '請先去除密碼' : '預覽合併結果' }}
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"></path>
+                  <circle cx="12" cy="12" r="2.5"></circle>
+                </svg>
+              </span>
+              <span class="preview-progress"><span class="spinner"></span>產生預覽…</span>
+            </button>
+            <button
+              class="merge-button"
+              type="button"
+              :class="{ 'is-loading': isBusy }"
+              :disabled="isBusy || hasLockedFiles"
+              @click="mergeAndDownload"
+            >
+              <span class="merge-label">
+                {{ hasLockedFiles ? '請先去除密碼' : '合併並下載' }}
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0 4-4m-4 4-4-4M5 19h14"></path></svg>
+              </span>
+              <span class="merge-progress"><span class="spinner"></span>正在合併…</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section class="trust-strip" aria-label="工具特色">
+        <div><span class="trust-number">01</span><p><strong>本機處理</strong><br>檔案不會上傳到伺服器</p></div>
+        <div><span class="trust-number">02</span><p><strong>自由排序</strong><br>拖曳或使用按鈕調整順序</p></div>
+        <div><span class="trust-number">03</span><p><strong>不限頁數</strong><br>上限取決於裝置可用記憶體</p></div>
+      </section>
+    </main>
+
+    <footer>
+      <span>HTML Tools / 合頁 PDF 工具</span>
+      <span>你的文件，只留在你的裝置。</span>
+    </footer>
+
+    <div class="toast-region" aria-live="polite" aria-atomic="true">
+      <div v-if="toastMessage" class="toast is-visible" :class="`toast-${toastType}`">{{ toastMessage }}</div>
+    </div>
+
+    <div
+      v-if="previewUrl"
+      class="overlay preview-overlay"
+      @click.self="closePreview"
+      @keydown.esc="closePreview"
+    >
+      <div class="modal preview-modal" role="dialog" aria-modal="true" aria-labelledby="preview-title">
+        <div class="modal-header">
+          <div>
+            <p class="section-label">PDF PREVIEW</p>
+            <h2 id="preview-title">{{ previewTitle }}</h2>
+            <p class="preview-meta">{{ previewPageCount }} 頁 · 僅在本機預覽</p>
+          </div>
+          <div class="preview-header-actions">
+            <a class="preview-open" :href="previewUrl" target="_blank" rel="noopener">另開視窗</a>
+            <button class="modal-close" type="button" @click="closePreview">關閉</button>
+          </div>
+        </div>
+        <div class="preview-frame-shell">
+          <div v-if="previewLoading" class="preview-loading" role="status">
+            <span class="spinner"></span>
+            正在繪製 PDF 頁面…
+          </div>
+          <p v-if="previewError" class="preview-error" role="alert">{{ previewError }}</p>
+          <div
+            ref="previewContainer"
+            class="preview-pages"
+            :aria-label="`${previewTitle} PDF 預覽`"
+          ></div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      v-if="unlockTarget"
+      class="overlay"
+      @click.self="closeUnlockDialog"
+      @keydown.esc="closeUnlockDialog"
+    >
+      <form
+        class="modal unlock-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="unlock-title"
+        @submit.prevent="unlockSelected"
+      >
+        <div class="modal-header">
+          <div>
+            <p class="section-label">ENCRYPTED PDF</p>
+            <h2 id="unlock-title">去除 PDF 密碼</h2>
+          </div>
+          <button class="modal-close" type="button" :disabled="isUnlocking" @click="closeUnlockDialog">關閉</button>
+        </div>
+
+        <div class="unlock-file-preview">
+          <span class="pdf-icon" aria-hidden="true">PDF</span>
+          <span>
+            <strong :title="unlockTarget.file.name">{{ unlockTarget.file.name }}</strong>
+            <small>已加密 · {{ formatBytes(unlockTarget.file.size) }}</small>
+          </span>
+        </div>
+
+        <label class="unlock-label" for="unlock-password">已知 PDF 密碼</label>
+        <div class="password-field">
+          <input
+            id="unlock-password"
+            ref="unlockPasswordInput"
+            v-model="unlockPassword"
+            :type="showUnlockPassword ? 'text' : 'password'"
+            autocomplete="off"
+            placeholder="輸入此檔案的密碼"
+          >
+          <button type="button" @click="showUnlockPassword = !showUnlockPassword">
+            {{ showUnlockPassword ? '隱藏' : '顯示' }}
+          </button>
+        </div>
+        <p v-if="unlockError" class="unlock-error" role="alert">{{ unlockError }}</p>
+
+        <div class="unlock-actions">
+          <button class="secondary-button" type="button" :disabled="isUnlocking" @click="closeUnlockDialog">取消</button>
+          <button class="merge-button unlock-submit" type="submit" :disabled="isUnlocking">
+            {{ isUnlocking ? '正在處理…' : '去除密碼' }}
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <div v-if="showChangelog" class="overlay" @click.self="showChangelog = false">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="changelog-title">
+        <div class="modal-header">
+          <div>
+            <p class="section-label">CHANGELOG</p>
+            <h2 id="changelog-title">版本紀錄</h2>
+          </div>
+          <button class="modal-close" type="button" @click="showChangelog = false">關閉</button>
+        </div>
+        <div class="release-entry">
+          <strong>v1.6.0</strong>
+          <span>2026-07-28</span>
+          <p>新增單檔預覽與合併結果預覽，可在下載前確認順序、頁數及頁面方向。</p>
+        </div>
+        <div class="release-entry">
+          <strong>v1.5.1</strong>
+          <span>2026-07-28</span>
+          <p>方向不符的頁面改為直接旋轉 90 度，不再縮放置中。</p>
+        </div>
+        <div class="release-entry">
+          <strong>v1.5.0</strong>
+          <span>2026-07-28</span>
+          <p>新增統一頁面方向選項，可選直向或橫向；未勾選時保留原始混合方向。</p>
+        </div>
+        <div class="release-entry">
+          <strong>v1.4.1</strong>
+          <span>2026-07-28</span>
+          <p>修正清單出現後「加入 PDF」按鈕無法再次開啟檔案選擇視窗。</p>
+        </div>
+        <div class="release-entry">
+          <strong>v1.4.0</strong>
+          <span>2026-07-28</span>
+          <p>解鎖後新增清楚可見的「單獨下載」按鈕，預設檔名為原檔名加上「已解密」。</p>
+        </div>
+        <div class="release-entry">
+          <strong>v1.3.0</strong>
+          <span>2026-07-28</span>
+          <p>加密 PDF 會先顯示檔案名稱，再由檔案列的「去除密碼」按鈕開啟密碼輸入。</p>
+        </div>
+        <div class="release-entry">
+          <strong>v1.2.0</strong>
+          <span>2026-07-28</span>
+          <p>新增深色模式，可手動切換並記住選擇；首次使用會依照裝置的顯示模式自動套用。</p>
+        </div>
+        <div class="release-entry">
+          <strong>v1.1.0</strong>
+          <span>2026-07-28</span>
+          <p>新增已知密碼解鎖、去除 PDF 密碼與無密碼版本下載，全部由瀏覽器本機 QPDF 引擎處理。</p>
+        </div>
+        <div class="release-entry">
+          <strong>v1.0.0</strong>
+          <span>2026-07-27</span>
+          <p>新增多 PDF 選擇、頁數讀取、順序調整、本機合併與下載功能。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
