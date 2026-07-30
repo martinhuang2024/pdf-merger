@@ -34,6 +34,12 @@ GitHub Pages：https://martinhuang2024.github.io/pdf-merger/
 
 ## 版本
 
+### v1.8.2
+
+- 完整恢復第一版的 `file.arrayBuffer()` 直接讀取及 `Promise.allSettled()` 並行加入流程。
+- 移除所有額外讀取包裝、逾時計時器與畫面等待，避免 Safari 停在「正在加入 PDF」。
+- 進度條保留，但改為每完成一份 PDF 時更新份數及百分比。
+
 ### v1.8.1
 
 - Safari／iOS 改用較穩定的 `Blob.arrayBuffer()` 讀取本機 PDF，避免 `FileReader` 偶發不結束。

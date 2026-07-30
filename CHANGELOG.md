@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.8.2 - 2026-07-30
+
+- 恢復最初版本已驗證可在 Safari 使用的直接 `file.arrayBuffer()` 讀取。
+- 恢復以 `Promise.allSettled()` 並行讀取多份 PDF，不再逐份等待。
+- 移除檔案讀取逾時包裝、`FileReader` 備援與額外畫面等待。
+- 進度改為每完成一份 PDF 更新，保留份數、百分比與檔名顯示。
+
 ## v1.8.1 - 2026-07-30
 
 - Safari 與 iOS 優先使用 `Blob.arrayBuffer()` 讀取從「檔案」或 iCloud 選取的 PDF。

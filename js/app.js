@@ -75,40 +75,8 @@
     return promise;
   }
 
-  function withTimeout(promise, timeoutMs, message) {
-    let timer;
-    return Promise.race([
-      promise,
-      new Promise((resolve, reject) => {
-        timer = setTimeout(() => reject(new Error(message)), timeoutMs);
-      }),
-    ]).finally(() => clearTimeout(timer));
-  }
-
-  async function readFileBuffer(file, onProgress, timeoutMs) {
-    const readTimeout = timeoutMs || 120000;
-    if (file && typeof file.arrayBuffer === "function") {
-      const buffer = await withTimeout(
-        file.arrayBuffer(),
-        readTimeout,
-        "檔案讀取逾時，請確認檔案已下載到裝置後再試一次"
-      );
-      if (onProgress) onProgress(file.size || buffer.byteLength, file.size || buffer.byteLength);
-      return buffer;
-    }
-    if (typeof root.FileReader !== "function") {
-      throw new Error("此瀏覽器不支援本機檔案讀取");
-    }
-    return withTimeout(new Promise((resolve, reject) => {
-      const reader = new root.FileReader();
-      reader.onprogress = (event) => {
-        if (onProgress) onProgress(event.loaded, event.lengthComputable ? event.total : file.size);
-      };
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = () => reject(reader.error || new Error("檔案讀取失敗"));
-      reader.onabort = () => reject(new Error("檔案讀取已取消"));
-      reader.readAsArrayBuffer(file);
-    }), readTimeout, "檔案讀取逾時，請確認檔案已下載到裝置後再試一次");
+  async function readFileBuffer(file) {
+    return file.arrayBuffer();
   }
 
   let qpdfPromise = null;
@@ -377,10 +345,8 @@
         }
       }
 
-      async function readPdf(file, onProgress, onPhase) {
-        const bytes = await readFileBuffer(file, onProgress);
-        if (onPhase) onPhase("分析中");
-        await new Promise((resolve) => setTimeout(resolve, 0));
+      async function readPdf(file) {
+        const bytes = await readFileBuffer(file);
         let pdf;
         let locked = false;
 
@@ -415,58 +381,40 @@
 
         isReading.value = true;
         try {
-          const results = [];
           const totalBytes = pdfFiles.reduce((total, file) => total + (file.size || 0), 0);
+          let completedCount = 0;
           let completedBytes = 0;
-          for (let index = 0; index < pdfFiles.length; index += 1) {
-            const file = pdfFiles[index];
-            readProgress.value = {
-              current: index + 1,
-              total: pdfFiles.length,
-              percent: totalBytes ? Math.round((completedBytes / totalBytes) * 100) : 0,
-              fileName: file.name,
-              phase: "讀取中",
-            };
+          readProgress.value = {
+            current: 0,
+            total: pdfFiles.length,
+            percent: 0,
+            fileName: pdfFiles[0].name,
+            phase: "正在讀取與分析",
+          };
+          const results = await Promise.allSettled(pdfFiles.map(async (file) => {
             try {
-              const item = await readPdf(
-                file,
-                (loaded) => {
-                  readProgress.value = {
-                    ...readProgress.value,
-                    percent: totalBytes
-                      ? Math.min(99, Math.round(((completedBytes + loaded) / totalBytes) * 100))
-                      : 0,
-                  };
-                },
-                (phase) => {
-                  readProgress.value = { ...readProgress.value, phase };
-                }
-              );
-              readProgress.value = { ...readProgress.value, phase: "分析完成" };
-              results.push({ status: "fulfilled", value: item });
-            } catch (reason) {
-              results.push({ status: "rejected", reason });
+              return await readPdf(file);
+            } finally {
+              completedCount += 1;
+              completedBytes += file.size || 0;
+              readProgress.value = {
+                current: completedCount,
+                total: pdfFiles.length,
+                percent: totalBytes
+                  ? Math.round((completedBytes / totalBytes) * 100)
+                  : Math.round((completedCount / pdfFiles.length) * 100),
+                fileName: file.name,
+                phase: "已完成",
+              };
             }
-            completedBytes += file.size || 0;
-            readProgress.value = {
-              ...readProgress.value,
-              percent: totalBytes ? Math.round((completedBytes / totalBytes) * 100) : 100,
-            };
-          }
-          await new Promise((resolve) => setTimeout(resolve, 240));
+          }));
           const accepted = results.filter((result) => result.status === "fulfilled").map((result) => result.value);
           const rejected = results.filter((result) => result.status === "rejected");
           const rejectedCount = rejected.length;
           queue.value = [...queue.value, ...accepted];
 
           if (rejectedCount) {
-            const timedOut = rejected.some((result) => /逾時/.test(String(result.reason && result.reason.message)));
-            showToast(
-              timedOut
-                ? `有 ${rejectedCount} 份 PDF 讀取逾時，請先在「檔案」中完整下載後再試。`
-                : `有 ${rejectedCount} 份 PDF 無法讀取，可能已損毀。`,
-              "error"
-            );
+            showToast(`有 ${rejectedCount} 份 PDF 無法讀取，可能已損毀。`, "error");
           } else {
             const encryptedCount = accepted.filter((item) => item.locked).length;
             if (encryptedCount) {
