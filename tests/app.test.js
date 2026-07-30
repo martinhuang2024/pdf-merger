@@ -77,15 +77,39 @@ test("isFileDrag distinguishes external files from internal queue dragging", () 
   assert.equal(isFileDrag(null), false);
 });
 
-test("readFileBuffer reports completion when FileReader is unavailable", async () => {
+test("readFileBuffer prefers arrayBuffer for Safari-compatible local reads", async () => {
   const source = new Uint8Array([1, 2, 3, 4]);
   const progress = [];
-  const result = await readFileBuffer(
-    { size: source.byteLength, arrayBuffer: async () => source.buffer },
-    (loaded, total) => progress.push([loaded, total])
+  const originalFileReader = global.FileReader;
+  let fileReaderConstructed = false;
+  global.FileReader = class {
+    constructor() {
+      fileReaderConstructed = true;
+      throw new Error("FileReader should not be used");
+    }
+  };
+  try {
+    const result = await readFileBuffer(
+      { size: source.byteLength, arrayBuffer: async () => source.buffer },
+      (loaded, total) => progress.push([loaded, total])
+    );
+    assert.deepEqual(new Uint8Array(result), source);
+    assert.deepEqual(progress, [[4, 4]]);
+    assert.equal(fileReaderConstructed, false);
+  } finally {
+    global.FileReader = originalFileReader;
+  }
+});
+
+test("readFileBuffer stops an indefinitely stalled file read", async () => {
+  await assert.rejects(
+    () => readFileBuffer(
+      { size: 10, arrayBuffer: () => new Promise(() => {}) },
+      null,
+      5
+    ),
+    /讀取逾時/
   );
-  assert.deepEqual(new Uint8Array(result), source);
-  assert.deepEqual(progress, [[4, 4]]);
 });
 
 test("resolveTheme keeps a saved choice and otherwise follows the device", () => {
@@ -212,7 +236,8 @@ test("HTML follows the html-tools local asset structure", () => {
   assert.match(html, /js\/theme-init\.js/);
   assert.match(html, /css\/styles\.css/);
   assert.match(html, /js\/app\.js/);
-  assert.match(html, /v1\.8\.0/);
+  assert.match(html, /class="version-btn"[\s\S]*?>v1\.8\.1</);
+  assert.match(html, /js\/app\.js\?v=1\.8\.1/);
   assert.match(html, /class="file-read-progress is-drop-progress"/);
   assert.match(html, /class="file-read-progress is-queue-progress"/);
   assert.match(html, /readProgress\.percent/);

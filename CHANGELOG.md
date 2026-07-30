@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.8.1 - 2026-07-30
+
+- Safari 與 iOS 優先使用 `Blob.arrayBuffer()` 讀取從「檔案」或 iCloud 選取的 PDF。
+- 在 PDF 分析前主動讓出畫面更新時機，使目前檔名與「分析中」狀態能正常顯示。
+- 新增檔案讀取逾時與全流程 `finally` 收尾，錯誤時會恢復選檔操作並顯示提示。
+
 ## v1.8.0 - 2026-07-30
 
 - 移除首次開啟時不必要的 PDF.js、PDF Worker 與 QPDF WebAssembly 載入。

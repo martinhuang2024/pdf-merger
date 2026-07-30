@@ -34,6 +34,12 @@ GitHub Pages：https://martinhuang2024.github.io/pdf-merger/
 
 ## 版本
 
+### v1.8.1
+
+- Safari／iOS 改用較穩定的 `Blob.arrayBuffer()` 讀取本機 PDF，避免 `FileReader` 偶發不結束。
+- PDF 分析前先讓瀏覽器更新進度畫面，避免大型檔案看起來像卡住。
+- 單一檔案讀取異常時會逾時結束並恢復操作，不再永久停在「正在加入 PDF」。
+
 ### v1.8.0
 
 - 首次開啟只載入合併所需資源；PDF 預覽與 QPDF 解密引擎改為使用時才載入。

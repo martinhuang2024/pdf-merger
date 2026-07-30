@@ -37,7 +37,7 @@
             <path d="M20 15.2A8 8 0 0 1 8.8 4 8 8 0 1 0 20 15.2Z"></path>
           </svg>
         </button>
-        <button class="version-btn" type="button" @click="showChangelog = true">v1.8.0</button>
+        <button class="version-btn" type="button" @click="showChangelog = true">v1.8.1</button>
       </div>
     </header>
 
@@ -503,6 +503,11 @@
           <button class="modal-close" type="button" @click="showChangelog = false">關閉</button>
         </div>
         <div class="release-entry">
+          <strong>v1.8.1</strong>
+          <span>2026-07-30</span>
+          <p>修正 Safari／iOS 從「檔案」或 iCloud 選取 PDF 後可能停在加入狀態；讀取逾時也會自動恢復並顯示提示。</p>
+        </div>
+        <div class="release-entry">
           <strong>v1.8.0</strong>
           <span>2026-07-30</span>
           <p>縮短首次開啟時間，解密與預覽引擎改為需要時才載入；加入多份 PDF 時新增檔名、份數與百分比進度。</p>
@@ -571,6 +576,6 @@
     </div>
   </div>
 
-  <script src="js/app.js?v=1.8.0"></script>
+  <script src="js/app.js?v=1.8.1"></script>
 </body>
 </html>
