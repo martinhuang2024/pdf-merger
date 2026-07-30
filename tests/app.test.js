@@ -20,6 +20,9 @@ const {
   moveItem,
   summarizeFiles,
   isFileDrag,
+  isSupportedImageFile,
+  isSupportedSourceFile,
+  getImagePageLayout,
   readFileBuffer,
   decryptPdfBytes,
   decryptPdfBatch,
@@ -75,6 +78,28 @@ test("isFileDrag distinguishes external files from internal queue dragging", () 
   assert.equal(isFileDrag({ types: ["text/plain", "Files"] }), true);
   assert.equal(isFileDrag({ types: ["text/plain"] }), false);
   assert.equal(isFileDrag(null), false);
+});
+
+test("supported source files include PDFs and common browser image formats", () => {
+  assert.equal(isSupportedSourceFile({ name: "report.pdf", type: "" }), true);
+  assert.equal(isSupportedImageFile({ name: "photo.JPG", type: "" }), true);
+  assert.equal(isSupportedImageFile({ name: "photo.heic", type: "image/heic" }), true);
+  assert.equal(isSupportedImageFile({ name: "graphic.webp", type: "image/webp" }), true);
+  assert.equal(isSupportedSourceFile({ name: "notes.txt", type: "text/plain" }), false);
+});
+
+test("getImagePageLayout fits portrait and landscape images on matching A4 pages", () => {
+  const portrait = getImagePageLayout(1200, 1800, 24);
+  assert.ok(portrait.pageHeight > portrait.pageWidth);
+  assert.ok(portrait.drawWidth <= portrait.pageWidth - 48);
+  assert.ok(portrait.drawHeight <= portrait.pageHeight - 48);
+  assert.ok(portrait.x >= 24);
+  assert.ok(portrait.y >= 24);
+
+  const landscape = getImagePageLayout(1800, 1200, 24);
+  assert.ok(landscape.pageWidth > landscape.pageHeight);
+  assert.ok(landscape.drawWidth <= landscape.pageWidth - 48);
+  assert.ok(landscape.drawHeight <= landscape.pageHeight - 48);
 });
 
 test("readFileBuffer uses the original direct arrayBuffer path", async () => {
@@ -222,8 +247,12 @@ test("HTML follows the html-tools local asset structure", () => {
   assert.match(html, /js\/theme-init\.js/);
   assert.match(html, /css\/styles\.css/);
   assert.match(html, /js\/app\.js/);
-  assert.match(html, /class="version-btn"[\s\S]*?>v1\.8\.2</);
-  assert.match(html, /js\/app\.js\?v=1\.8\.2/);
+  assert.match(html, /class="version-btn"[\s\S]*?>v1\.9\.0</);
+  assert.match(html, /js\/app\.js\?v=1\.9\.0/);
+  assert.match(html, /css\/styles\.css\?v=1\.9\.0/);
+  assert.match(html, /\.jpg,.jpeg,.png,.webp,.heic,.heif/);
+  assert.match(html, /把 PDF 或圖片放到這裡/);
+  assert.match(html, /item\.sourceType === 'image'/);
   assert.match(html, /class="file-read-progress is-drop-progress"/);
   assert.match(html, /class="file-read-progress is-queue-progress"/);
   assert.match(html, /readProgress\.percent/);
@@ -261,8 +290,10 @@ test("whole page registers and removes external PDF drag listeners", () => {
 
 test("file adding keeps the original parallel Promise.allSettled path", () => {
   const source = fs.readFileSync(path.join(__dirname, "..", "js", "app.js"), "utf8");
-  assert.match(source, /Promise\.allSettled\(pdfFiles\.map/);
+  assert.match(source, /Promise\.allSettled\(tasks\)/);
   assert.match(source, /return file\.arrayBuffer\(\)/);
+  assert.match(source, /operation = readPdf\(file\)/);
+  assert.match(source, /imageQueue = operation\.catch/);
   assert.doesNotMatch(source, /new root\.FileReader/);
   assert.doesNotMatch(source, /requestAnimationFrame/);
 });

@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="description" content="在瀏覽器本機排序並合併多個 PDF，檔案不會上傳。">
+  <meta name="description" content="在瀏覽器本機排序並合併 PDF 與圖片，檔案不會上傳。">
   <title>合頁 · PDF 合併工具</title>
   <script src="js/theme-init.js"></script>
-  <link rel="stylesheet" href="css/styles.css?v=1.8.0">
+  <link rel="stylesheet" href="css/styles.css?v=1.9.0">
   <script src="vendor/vue.global.prod.js"></script>
   <script src="vendor/pdf-lib.min.js"></script>
 </head>
@@ -37,7 +37,7 @@
             <path d="M20 15.2A8 8 0 0 1 8.8 4 8 8 0 1 0 20 15.2Z"></path>
           </svg>
         </button>
-        <button class="version-btn" type="button" @click="showChangelog = true">v1.8.2</button>
+        <button class="version-btn" type="button" @click="showChangelog = true">v1.9.0</button>
       </div>
     </header>
 
@@ -46,7 +46,7 @@
         <p class="eyebrow">HTML TOOLS / PDF MERGE DESK</p>
         <h1 id="page-title">把散落的頁面，<br>整理成一份文件。</h1>
         <p class="intro-copy">
-          加入多個 PDF、排好順序，然後一次合併下載。<br class="desktop-only">
+          加入 PDF 或圖片、排好順序，然後一次合併下載。<br class="desktop-only">
           不需註冊，檔案也不會離開這個瀏覽器。
         </p>
       </section>
@@ -57,7 +57,7 @@
           ref="fileInput"
           class="file-input-native"
           type="file"
-          accept=".pdf,application/pdf"
+          accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,application/pdf,image/jpeg,image/png,image/webp,image/heic,image/heif"
           multiple
           aria-hidden="true"
           tabindex="-1"
@@ -70,7 +70,7 @@
           class="drop-zone"
           :class="{ 'is-over': dragActive, 'is-reading': isReading }"
           tabindex="0"
-          aria-label="選擇或拖曳 PDF 檔案"
+          aria-label="選擇或拖曳 PDF 與圖片"
           :for="isReading ? null : 'file-input'"
           @click="isReading && $event.preventDefault()"
           @keydown.enter.prevent="openFilePicker"
@@ -84,14 +84,14 @@
             </span>
           </div>
           <div class="drop-copy">
-            <strong>{{ isReading ? '正在加入 PDF…' : '把 PDF 放到這裡' }}</strong>
+            <strong>{{ isReading ? '正在加入檔案…' : '把 PDF 或圖片放到這裡' }}</strong>
             <span>{{ isReading ? '檔案只在這台裝置處理' : '或點一下選擇檔案' }}</span>
           </div>
           <div
             v-if="isReading"
             class="file-read-progress is-drop-progress"
             role="progressbar"
-            aria-label="加入 PDF 進度"
+            aria-label="加入檔案進度"
             aria-valuemin="0"
             aria-valuemax="100"
             :aria-valuenow="readProgress.percent"
@@ -105,7 +105,7 @@
             </div>
             <small :title="readProgress.fileName">{{ readProgress.fileName }}</small>
           </div>
-          <span class="drop-format">PDF · 可多選</span>
+          <span class="drop-format">PDF · JPG · PNG · 可多選</span>
         </label>
 
         <div v-else class="queue-panel">
@@ -119,7 +119,7 @@
             </div>
             <button class="text-button" type="button" :disabled="isBusy" @click="openFilePicker">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
-              加入 PDF
+              加入 PDF／圖片
             </button>
           </div>
 
@@ -127,7 +127,7 @@
             v-if="isReading"
             class="file-read-progress is-queue-progress"
             role="progressbar"
-            aria-label="追加 PDF 進度"
+            aria-label="追加檔案進度"
             aria-valuemin="0"
             aria-valuemax="100"
             :aria-valuenow="readProgress.percent"
@@ -172,7 +172,7 @@
             </button>
           </div>
 
-          <ol class="file-list" aria-label="待合併 PDF 清單">
+          <ol class="file-list" aria-label="待合併檔案清單">
             <li
               v-for="(item, index) in queue"
               :key="item.id"
@@ -186,7 +186,9 @@
             >
               <span class="drag-handle" title="拖曳調整順序" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span>
               <span class="order-number">{{ String(index + 1).padStart(2, '0') }}</span>
-              <span class="pdf-icon" aria-hidden="true">PDF</span>
+              <span class="pdf-icon" :class="{ 'image-icon': item.sourceType === 'image' }" aria-hidden="true">
+                {{ item.sourceType === 'image' ? 'IMG' : 'PDF' }}
+              </span>
               <span class="file-info">
                 <strong :title="item.file.name">{{ item.file.name }}</strong>
                 <span class="file-meta">
@@ -503,6 +505,11 @@
           <button class="modal-close" type="button" @click="showChangelog = false">關閉</button>
         </div>
         <div class="release-entry">
+          <strong>v1.9.0</strong>
+          <span>2026-07-30</span>
+          <p>新增 JPG、PNG、WebP、HEIC／HEIF 圖片；圖片會在本機轉為單頁 PDF，可與 PDF 混合排序、預覽及合併。</p>
+        </div>
+        <div class="release-entry">
           <strong>v1.8.2</strong>
           <span>2026-07-30</span>
           <p>完整恢復第一版可在 Safari 使用的直接讀取與並行加入流程；進度改為每完成一份 PDF 更新。</p>
@@ -581,6 +588,6 @@
     </div>
   </div>
 
-  <script src="js/app.js?v=1.8.2"></script>
+  <script src="js/app.js?v=1.9.0"></script>
 </body>
 </html>

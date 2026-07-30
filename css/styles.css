@@ -715,6 +715,11 @@ main {
   border-color: var(--accent);
 }
 
+.pdf-icon.image-icon {
+  border-color: color-mix(in srgb, var(--green) 62%, var(--ink));
+  color: var(--green);
+}
+
 .file-item.is-dragging {
   opacity: 0.35;
 }

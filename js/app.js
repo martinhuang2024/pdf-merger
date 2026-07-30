@@ -56,6 +56,48 @@
       .some((type) => String(type).toLowerCase() === "files");
   }
 
+  function isSupportedImageFile(file) {
+    const name = String((file && file.name) || "").toLowerCase();
+    const type = String((file && file.type) || "").toLowerCase();
+    return /^image\/(jpeg|png|webp|heic|heif)$/.test(type)
+      || /\.(jpe?g|png|webp|heic|heif)$/.test(name);
+  }
+
+  function isSupportedSourceFile(file) {
+    const name = String((file && file.name) || "").toLowerCase();
+    return Boolean(
+      file
+      && (
+        file.type === "application/pdf"
+        || name.endsWith(".pdf")
+        || isSupportedImageFile(file)
+      )
+    );
+  }
+
+  function getImagePageLayout(width, height, margin) {
+    const safeWidth = Math.max(1, Number(width) || 1);
+    const safeHeight = Math.max(1, Number(height) || 1);
+    const pageMargin = Number.isFinite(margin) ? Math.max(0, margin) : 24;
+    const portrait = safeHeight >= safeWidth;
+    const pageWidth = portrait ? 595.28 : 841.89;
+    const pageHeight = portrait ? 841.89 : 595.28;
+    const scale = Math.min(
+      (pageWidth - pageMargin * 2) / safeWidth,
+      (pageHeight - pageMargin * 2) / safeHeight
+    );
+    const drawWidth = safeWidth * scale;
+    const drawHeight = safeHeight * scale;
+    return {
+      pageWidth,
+      pageHeight,
+      drawWidth,
+      drawHeight,
+      x: (pageWidth - drawWidth) / 2,
+      y: (pageHeight - drawHeight) / 2,
+    };
+  }
+
   const assetPromises = new Map();
 
   function loadScriptOnce(src) {
@@ -253,6 +295,9 @@
     moveItem,
     summarizeFiles,
     isFileDrag,
+    isSupportedImageFile,
+    isSupportedSourceFile,
+    getImagePageLayout,
     readFileBuffer,
     decryptPdfBytes,
     decryptPdfBatch,
@@ -367,54 +412,139 @@
           pageCount: pdf ? pdf.getPageCount() : 0,
           locked,
           unlocked: false,
+          sourceType: "pdf",
+        };
+      }
+
+      function loadImage(file) {
+        return new Promise((resolve, reject) => {
+          const url = URL.createObjectURL(file);
+          const image = new Image();
+          image.onload = () => {
+            URL.revokeObjectURL(url);
+            resolve(image);
+          };
+          image.onerror = () => {
+            URL.revokeObjectURL(url);
+            reject(new Error("圖片格式無法由此瀏覽器解碼"));
+          };
+          image.src = url;
+        });
+      }
+
+      function canvasToJpeg(canvas) {
+        return new Promise((resolve, reject) => {
+          canvas.toBlob(
+            (blob) => {
+              if (blob) resolve(blob);
+              else reject(new Error("圖片轉換失敗"));
+            },
+            "image/jpeg",
+            0.9
+          );
+        });
+      }
+
+      async function readImage(file) {
+        const image = await loadImage(file);
+        const sourceWidth = image.naturalWidth || image.width;
+        const sourceHeight = image.naturalHeight || image.height;
+        if (!sourceWidth || !sourceHeight) throw new Error("圖片尺寸無效");
+
+        const maxDimension = 3000;
+        const imageScale = Math.min(1, maxDimension / Math.max(sourceWidth, sourceHeight));
+        const width = Math.max(1, Math.round(sourceWidth * imageScale));
+        const height = Math.max(1, Math.round(sourceHeight * imageScale));
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const context = canvas.getContext("2d", { alpha: false });
+        if (!context) throw new Error("圖片畫布建立失敗");
+        context.fillStyle = "#ffffff";
+        context.fillRect(0, 0, width, height);
+        context.drawImage(image, 0, 0, width, height);
+
+        const jpegBlob = await canvasToJpeg(canvas);
+        const jpegBytes = await jpegBlob.arrayBuffer();
+        canvas.width = 1;
+        canvas.height = 1;
+
+        const pdf = await root.PDFLib.PDFDocument.create();
+        const embeddedImage = await pdf.embedJpg(jpegBytes);
+        const layout = getImagePageLayout(width, height, 24);
+        const page = pdf.addPage([layout.pageWidth, layout.pageHeight]);
+        page.drawImage(embeddedImage, {
+          x: layout.x,
+          y: layout.y,
+          width: layout.drawWidth,
+          height: layout.drawHeight,
+        });
+        pdf.setTitle(file.name);
+        pdf.setProducer("HTML Tools / 合頁 PDF 工具");
+
+        return {
+          id: root.crypto && root.crypto.randomUUID ? root.crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+          file,
+          bytes: await pdf.save(),
+          pageCount: 1,
+          locked: false,
+          unlocked: false,
+          sourceType: "image",
         };
       }
 
       async function addFiles(fileList) {
         if (isBusy.value || isReading.value) return;
         const files = Array.from(fileList || []);
-        const pdfFiles = files.filter((file) => file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf"));
-        if (!pdfFiles.length) {
-          showToast("請選擇 PDF 格式的檔案。", "error");
+        const sourceFiles = files.filter(isSupportedSourceFile);
+        if (!sourceFiles.length) {
+          showToast("請選擇 PDF、JPG、PNG、WebP 或 HEIC 圖片。", "error");
           return;
         }
 
         isReading.value = true;
         try {
-          const totalBytes = pdfFiles.reduce((total, file) => total + (file.size || 0), 0);
+          const totalBytes = sourceFiles.reduce((total, file) => total + (file.size || 0), 0);
           let completedCount = 0;
           let completedBytes = 0;
           readProgress.value = {
             current: 0,
-            total: pdfFiles.length,
+            total: sourceFiles.length,
             percent: 0,
-            fileName: pdfFiles[0].name,
+            fileName: sourceFiles[0].name,
             phase: "正在讀取與分析",
           };
-          const results = await Promise.allSettled(pdfFiles.map(async (file) => {
-            try {
-              return await readPdf(file);
-            } finally {
+          let imageQueue = Promise.resolve();
+          const tasks = sourceFiles.map((file) => {
+            let operation;
+            if (isSupportedImageFile(file)) {
+              operation = imageQueue.then(() => readImage(file));
+              imageQueue = operation.catch(() => undefined);
+            } else {
+              operation = readPdf(file);
+            }
+            return operation.finally(() => {
               completedCount += 1;
               completedBytes += file.size || 0;
               readProgress.value = {
                 current: completedCount,
-                total: pdfFiles.length,
+                total: sourceFiles.length,
                 percent: totalBytes
                   ? Math.round((completedBytes / totalBytes) * 100)
-                  : Math.round((completedCount / pdfFiles.length) * 100),
+                  : Math.round((completedCount / sourceFiles.length) * 100),
                 fileName: file.name,
                 phase: "已完成",
               };
-            }
-          }));
+            });
+          });
+          const results = await Promise.allSettled(tasks);
           const accepted = results.filter((result) => result.status === "fulfilled").map((result) => result.value);
           const rejected = results.filter((result) => result.status === "rejected");
           const rejectedCount = rejected.length;
           queue.value = [...queue.value, ...accepted];
 
           if (rejectedCount) {
-            showToast(`有 ${rejectedCount} 份 PDF 無法讀取，可能已損毀。`, "error");
+            showToast(`有 ${rejectedCount} 份檔案無法讀取，可能格式不支援或已損毀。`, "error");
           } else {
             const encryptedCount = accepted.filter((item) => item.locked).length;
             if (encryptedCount) {
@@ -422,15 +552,15 @@
                 `已顯示 ${accepted.length} 份 PDF，其中 ${encryptedCount} 份已加密。可單檔解密或勾選後批次處理。`,
                 "success"
               );
-            } else if (files.length !== pdfFiles.length) {
-              showToast("已加入 PDF，並略過非 PDF 格式的檔案。", "success");
+            } else if (files.length !== sourceFiles.length) {
+              showToast("已加入 PDF／圖片，並略過不支援的格式。", "success");
             } else {
-              showToast(`已加入 ${accepted.length} 份 PDF。`, "success");
+              showToast(`已加入 ${accepted.length} 份 PDF／圖片。`, "success");
             }
           }
         } catch (error) {
           console.error(error);
-          showToast("加入 PDF 時發生錯誤，請重新選擇檔案。", "error");
+          showToast("加入檔案時發生錯誤，請重新選擇。", "error");
         } finally {
           isReading.value = false;
           readProgress.value = { current: 0, total: 0, percent: 0, fileName: "", phase: "" };
