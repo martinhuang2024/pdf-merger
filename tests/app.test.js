@@ -20,6 +20,7 @@ const {
   moveItem,
   summarizeFiles,
   isFileDrag,
+  readFileBuffer,
   decryptPdfBytes,
   decryptPdfBatch,
   mergePdfBuffers,
@@ -74,6 +75,17 @@ test("isFileDrag distinguishes external files from internal queue dragging", () 
   assert.equal(isFileDrag({ types: ["text/plain", "Files"] }), true);
   assert.equal(isFileDrag({ types: ["text/plain"] }), false);
   assert.equal(isFileDrag(null), false);
+});
+
+test("readFileBuffer reports completion when FileReader is unavailable", async () => {
+  const source = new Uint8Array([1, 2, 3, 4]);
+  const progress = [];
+  const result = await readFileBuffer(
+    { size: source.byteLength, arrayBuffer: async () => source.buffer },
+    (loaded, total) => progress.push([loaded, total])
+  );
+  assert.deepEqual(new Uint8Array(result), source);
+  assert.deepEqual(progress, [[4, 4]]);
 });
 
 test("resolveTheme keeps a saved choice and otherwise follows the device", () => {
@@ -195,14 +207,15 @@ test("HTML follows the html-tools local asset structure", () => {
   const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
   assert.match(html, /vendor\/vue\.global\.prod\.js/);
   assert.match(html, /vendor\/pdf-lib\.min\.js/);
-  assert.match(html, /vendor\/pdf\.worker\.min\.js/);
-  assert.match(html, /vendor\/pdf\.min\.js/);
-  assert.match(html, /vendor\/qpdf-wasm-base64\.js/);
-  assert.match(html, /vendor\/qpdf\.js/);
+  assert.doesNotMatch(html, /<script src="vendor\/pdf(?:\.worker)?\.min\.js/);
+  assert.doesNotMatch(html, /<script src="vendor\/qpdf(?:-wasm-base64)?\.js/);
   assert.match(html, /js\/theme-init\.js/);
   assert.match(html, /css\/styles\.css/);
   assert.match(html, /js\/app\.js/);
-  assert.match(html, /v1\.7\.0/);
+  assert.match(html, /v1\.8\.0/);
+  assert.match(html, /class="file-read-progress is-drop-progress"/);
+  assert.match(html, /class="file-read-progress is-queue-progress"/);
+  assert.match(html, /readProgress\.percent/);
   assert.match(html, /class="overlay unlock-overlay"/);
   assert.match(html, /viewport-fit=cover/);
   assert.match(html, />\s*去除密碼\s*</);
@@ -233,4 +246,12 @@ test("whole page registers and removes external PDF drag listeners", () => {
   assert.match(source, /document\.addEventListener\("drop", handlePageDrop\)/);
   assert.match(source, /document\.removeEventListener\("drop", handlePageDrop\)/);
   assert.match(source, /addFiles\(event\.dataTransfer\.files\)/);
+});
+
+test("heavy preview and decryption engines load only when requested", () => {
+  const source = fs.readFileSync(path.join(__dirname, "..", "js", "app.js"), "utf8");
+  assert.match(source, /loadScriptOnce\("vendor\/pdf\.min\.js\?v=1\.8\.0"\)/);
+  assert.match(source, /workerSrc = "vendor\/pdf\.worker\.min\.js\?v=1\.8\.0"/);
+  assert.match(source, /loadScriptOnce\("vendor\/qpdf-wasm-base64\.js\?v=1\.8\.0"\)/);
+  assert.match(source, /loadScriptOnce\("vendor\/qpdf\.js\?v=1\.8\.0"\)/);
 });

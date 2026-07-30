@@ -6,13 +6,9 @@
   <meta name="description" content="在瀏覽器本機排序並合併多個 PDF，檔案不會上傳。">
   <title>合頁 · PDF 合併工具</title>
   <script src="js/theme-init.js"></script>
-  <link rel="stylesheet" href="css/styles.css?v=1.7.0">
+  <link rel="stylesheet" href="css/styles.css?v=1.8.0">
   <script src="vendor/vue.global.prod.js"></script>
   <script src="vendor/pdf-lib.min.js"></script>
-  <script src="vendor/pdf.worker.min.js"></script>
-  <script src="vendor/pdf.min.js"></script>
-  <script src="vendor/qpdf-wasm-base64.js"></script>
-  <script src="vendor/qpdf.js"></script>
 </head>
 <body>
   <div id="app" class="page-shell" v-cloak>
@@ -41,7 +37,7 @@
             <path d="M20 15.2A8 8 0 0 1 8.8 4 8 8 0 1 0 20 15.2Z"></path>
           </svg>
         </button>
-        <button class="version-btn" type="button" @click="showChangelog = true">v1.7.0</button>
+        <button class="version-btn" type="button" @click="showChangelog = true">v1.8.0</button>
       </div>
     </header>
 
@@ -75,7 +71,8 @@
           :class="{ 'is-over': dragActive, 'is-reading': isReading }"
           tabindex="0"
           aria-label="選擇或拖曳 PDF 檔案"
-          for="file-input"
+          :for="isReading ? null : 'file-input'"
+          @click="isReading && $event.preventDefault()"
           @keydown.enter.prevent="openFilePicker"
           @keydown.space.prevent="openFilePicker"
         >
@@ -87,8 +84,26 @@
             </span>
           </div>
           <div class="drop-copy">
-            <strong>{{ isReading ? '正在讀取 PDF…' : '把 PDF 放到這裡' }}</strong>
-            <span>或點一下選擇檔案</span>
+            <strong>{{ isReading ? '正在加入 PDF…' : '把 PDF 放到這裡' }}</strong>
+            <span>{{ isReading ? '檔案只在這台裝置處理' : '或點一下選擇檔案' }}</span>
+          </div>
+          <div
+            v-if="isReading"
+            class="file-read-progress is-drop-progress"
+            role="progressbar"
+            aria-label="加入 PDF 進度"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            :aria-valuenow="readProgress.percent"
+          >
+            <div class="file-read-progress-head">
+              <strong>{{ readProgress.phase }} {{ readProgress.current }} / {{ readProgress.total }}</strong>
+              <span>{{ readProgress.percent }}%</span>
+            </div>
+            <div class="file-read-progress-track" aria-hidden="true">
+              <i :style="{ width: `${readProgress.percent}%` }"></i>
+            </div>
+            <small :title="readProgress.fileName">{{ readProgress.fileName }}</small>
           </div>
           <span class="drop-format">PDF · 可多選</span>
         </label>
@@ -106,6 +121,25 @@
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
               加入 PDF
             </button>
+          </div>
+
+          <div
+            v-if="isReading"
+            class="file-read-progress is-queue-progress"
+            role="progressbar"
+            aria-label="追加 PDF 進度"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            :aria-valuenow="readProgress.percent"
+          >
+            <div class="file-read-progress-head">
+              <strong>正在加入 {{ readProgress.current }} / {{ readProgress.total }}</strong>
+              <span>{{ readProgress.percent }}%</span>
+            </div>
+            <div class="file-read-progress-track" aria-hidden="true">
+              <i :style="{ width: `${readProgress.percent}%` }"></i>
+            </div>
+            <small :title="readProgress.fileName">{{ readProgress.fileName }} · 僅在本機讀取</small>
           </div>
 
           <div v-if="lockedCount" class="batch-unlock-bar">
@@ -469,6 +503,11 @@
           <button class="modal-close" type="button" @click="showChangelog = false">關閉</button>
         </div>
         <div class="release-entry">
+          <strong>v1.8.0</strong>
+          <span>2026-07-30</span>
+          <p>縮短首次開啟時間，解密與預覽引擎改為需要時才載入；加入多份 PDF 時新增檔名、份數與百分比進度。</p>
+        </div>
+        <div class="release-entry">
           <strong>v1.7.0</strong>
           <span>2026-07-29</span>
           <p>新增多檔案批次解密；可勾選多份加密 PDF，一次輸入共同密碼依序處理。</p>
@@ -532,6 +571,6 @@
     </div>
   </div>
 
-  <script src="js/app.js?v=1.7.0"></script>
+  <script src="js/app.js?v=1.8.0"></script>
 </body>
 </html>

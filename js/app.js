@@ -56,7 +56,45 @@
       .some((type) => String(type).toLowerCase() === "files");
   }
 
+  const assetPromises = new Map();
+
+  function loadScriptOnce(src) {
+    if (assetPromises.has(src)) return assetPromises.get(src);
+    if (typeof document === "undefined") {
+      return Promise.reject(new Error(`無法載入瀏覽器資源：${src}`));
+    }
+    const promise = new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = src;
+      script.async = true;
+      script.onload = resolve;
+      script.onerror = () => reject(new Error(`資源載入失敗：${src}`));
+      document.head.appendChild(script);
+    });
+    assetPromises.set(src, promise);
+    return promise;
+  }
+
+  async function readFileBuffer(file, onProgress) {
+    if (typeof root.FileReader !== "function") {
+      const buffer = await file.arrayBuffer();
+      if (onProgress) onProgress(file.size || buffer.byteLength, file.size || buffer.byteLength);
+      return buffer;
+    }
+    return new Promise((resolve, reject) => {
+      const reader = new root.FileReader();
+      reader.onprogress = (event) => {
+        if (onProgress) onProgress(event.loaded, event.lengthComputable ? event.total : file.size);
+      };
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error || new Error("檔案讀取失敗"));
+      reader.onabort = () => reject(new Error("檔案讀取已取消"));
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
   let qpdfPromise = null;
+  let qpdfAssetPromise = null;
   let qpdfWasmUrl = "";
   let qpdfOutput = [];
   let qpdfErrors = [];
@@ -70,10 +108,27 @@
     return bytes;
   }
 
-  function getQpdfModule() {
+  async function ensureQpdfAssets() {
+    if (typeof root.Module === "function" && root.QPDF_WASM_BASE64) return;
+    if (!qpdfAssetPromise) {
+      qpdfAssetPromise = (async () => {
+        if (!root.QPDF_WASM_BASE64) {
+          await loadScriptOnce("vendor/qpdf-wasm-base64.js?v=1.8.0");
+        }
+        if (typeof root.Module !== "function") {
+          await loadScriptOnce("vendor/qpdf.js?v=1.8.0");
+        }
+      })();
+    }
+    await qpdfAssetPromise;
+  }
+
+  async function getQpdfModule() {
+    if (qpdfPromise) return qpdfPromise;
+    await ensureQpdfAssets();
     if (qpdfPromise) return qpdfPromise;
     if (typeof root.Module !== "function") {
-      return Promise.reject(new Error("QPDF 引擎尚未載入"));
+      throw new Error("QPDF 引擎尚未載入");
     }
 
     let wasmLocation = root.QPDF_WASM_PATH;
@@ -95,6 +150,20 @@
       printErr: (message) => qpdfErrors.push(String(message)),
     });
     return qpdfPromise;
+  }
+
+  let pdfPreviewAssetPromise = null;
+
+  async function ensurePdfPreviewEngine() {
+    if (!root.pdfjsLib) {
+      if (!pdfPreviewAssetPromise) {
+        pdfPreviewAssetPromise = loadScriptOnce("vendor/pdf.min.js?v=1.8.0");
+      }
+      await pdfPreviewAssetPromise;
+    }
+    if (!root.pdfjsLib) throw new Error("PDF 預覽引擎尚未載入");
+    root.pdfjsLib.GlobalWorkerOptions.workerSrc = "vendor/pdf.worker.min.js?v=1.8.0";
+    return root.pdfjsLib;
   }
 
   async function decryptPdfBytes(bytes, password) {
@@ -198,6 +267,7 @@
     moveItem,
     summarizeFiles,
     isFileDrag,
+    readFileBuffer,
     decryptPdfBytes,
     decryptPdfBatch,
     isEncryptedPdfError,
@@ -218,6 +288,13 @@
       const pageOrientation = ref("portrait");
       const dragActive = ref(false);
       const isReading = ref(false);
+      const readProgress = ref({
+        current: 0,
+        total: 0,
+        percent: 0,
+        fileName: "",
+        phase: "",
+      });
       const isBusy = ref(false);
       const isUnlocking = ref(false);
       const isBatchUnlocking = ref(false);
@@ -270,7 +347,7 @@
       }
 
       function openFilePicker() {
-        if (!isBusy.value && fileInput.value) fileInput.value.click();
+        if (!isBusy.value && !isReading.value && fileInput.value) fileInput.value.click();
       }
 
       function toggleTheme() {
@@ -282,8 +359,8 @@
         }
       }
 
-      async function readPdf(file) {
-        const bytes = await file.arrayBuffer();
+      async function readPdf(file, onProgress) {
+        const bytes = await readFileBuffer(file, onProgress);
         let pdf;
         let locked = false;
 
@@ -317,12 +394,45 @@
         }
 
         isReading.value = true;
-        const results = await Promise.allSettled(pdfFiles.map(readPdf));
+        const results = [];
+        const totalBytes = pdfFiles.reduce((total, file) => total + (file.size || 0), 0);
+        let completedBytes = 0;
+        for (let index = 0; index < pdfFiles.length; index += 1) {
+          const file = pdfFiles[index];
+          readProgress.value = {
+            current: index + 1,
+            total: pdfFiles.length,
+            percent: totalBytes ? Math.round((completedBytes / totalBytes) * 100) : 0,
+            fileName: file.name,
+            phase: "讀取中",
+          };
+          try {
+            const item = await readPdf(file, (loaded) => {
+              readProgress.value = {
+                ...readProgress.value,
+                percent: totalBytes
+                  ? Math.min(99, Math.round(((completedBytes + loaded) / totalBytes) * 100))
+                  : 0,
+              };
+            });
+            readProgress.value = { ...readProgress.value, phase: "分析完成" };
+            results.push({ status: "fulfilled", value: item });
+          } catch (reason) {
+            results.push({ status: "rejected", reason });
+          }
+          completedBytes += file.size || 0;
+          readProgress.value = {
+            ...readProgress.value,
+            percent: totalBytes ? Math.round((completedBytes / totalBytes) * 100) : 100,
+          };
+        }
+        await new Promise((resolve) => setTimeout(resolve, 240));
         const accepted = results.filter((result) => result.status === "fulfilled").map((result) => result.value);
         const rejected = results.filter((result) => result.status === "rejected");
         const rejectedCount = rejected.length;
         queue.value = [...queue.value, ...accepted];
         isReading.value = false;
+        readProgress.value = { current: 0, total: 0, percent: 0, fileName: "", phase: "" };
         if (fileInput.value) fileInput.value.value = "";
 
         if (rejectedCount) {
@@ -595,13 +705,14 @@
 
       async function renderPdfPreview(bytes, token) {
         const container = previewContainer.value;
-        if (!container || !root.pdfjsLib) {
+        if (!container) {
           previewLoading.value = false;
           previewError.value = "PDF 預覽引擎尚未載入。";
           return;
         }
         container.replaceChildren();
         try {
+          await ensurePdfPreviewEngine();
           const loadingTask = root.pdfjsLib.getDocument({
             data: new Uint8Array(bytes).slice(),
           });
@@ -751,7 +862,7 @@
 
       return {
         queue, fileInput, outputName, normalizeOrientation, pageOrientation,
-        dragActive, isReading, isBusy, isUnlocking, isBatchUnlocking, isPreviewing, draggedId,
+        dragActive, isReading, readProgress, isBusy, isUnlocking, isBatchUnlocking, isPreviewing, draggedId,
         toastMessage, toastType, showChangelog, unlockTarget, unlockPassword, unlockPasswordInput,
         showUnlockPassword, unlockError, theme, isDarkMode, summary, lockedCount, hasLockedFiles,
         selectedLockedIds, batchUnlockOpen, batchUnlockPassword, batchUnlockPasswordInput,
