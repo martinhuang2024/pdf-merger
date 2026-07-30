@@ -247,12 +247,14 @@ test("HTML follows the html-tools local asset structure", () => {
   assert.match(html, /js\/theme-init\.js/);
   assert.match(html, /css\/styles\.css/);
   assert.match(html, /js\/app\.js/);
-  assert.match(html, /class="version-btn"[\s\S]*?>v1\.9\.0</);
-  assert.match(html, /js\/app\.js\?v=1\.9\.0/);
-  assert.match(html, /css\/styles\.css\?v=1\.9\.0/);
+  assert.match(html, /class="version-btn"[\s\S]*?>v1\.9\.1</);
+  assert.match(html, /js\/app\.js\?v=1\.9\.1/);
+  assert.match(html, /css\/styles\.css\?v=1\.9\.1/);
   assert.match(html, /\.jpg,.jpeg,.png,.webp,.heic,.heif/);
   assert.match(html, /把 PDF 或圖片放到這裡/);
   assert.match(html, /item\.sourceType === 'image'/);
+  assert.match(html, /aria-label="批次解密進度"/);
+  assert.match(html, /batchUnlockPercent/);
   assert.match(html, /class="file-read-progress is-drop-progress"/);
   assert.match(html, /class="file-read-progress is-queue-progress"/);
   assert.match(html, /readProgress\.percent/);
@@ -296,6 +298,13 @@ test("file adding keeps the original parallel Promise.allSettled path", () => {
   assert.match(source, /imageQueue = operation\.catch/);
   assert.doesNotMatch(source, /new root\.FileReader/);
   assert.doesNotMatch(source, /requestAnimationFrame/);
+});
+
+test("batch decryption yields so progress can repaint between files", () => {
+  const source = fs.readFileSync(path.join(__dirname, "..", "js", "app.js"), "utf8");
+  assert.match(source, /batchUnlockCurrent\.value = processedCount/);
+  assert.match(source, /batchUnlockProgress\.value = `已完成 \$\{processedCount\} \/ \$\{targets\.length\}`/);
+  assert.match(source, /await nextTick\(\);\s*await new Promise\(\(resolve\) => setTimeout\(resolve, 0\)\)/);
 });
 
 test("heavy preview and decryption engines load only when requested", () => {

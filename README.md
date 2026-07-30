@@ -36,6 +36,11 @@ GitHub Pages：https://martinhuang2024.github.io/pdf-merger/
 
 ## 版本
 
+### v1.9.1
+
+- 修正批次解密時進度狀態未即時顯示。
+- 新增依完成份數更新的百分比進度條。
+
 ### v1.9.0
 
 - 新增 JPG、PNG、WebP、HEIC／HEIF 圖片選取與整頁拖入。

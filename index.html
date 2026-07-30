@@ -6,7 +6,7 @@
   <meta name="description" content="在瀏覽器本機排序並合併 PDF 與圖片，檔案不會上傳。">
   <title>合頁 · PDF 合併工具</title>
   <script src="js/theme-init.js"></script>
-  <link rel="stylesheet" href="css/styles.css?v=1.9.0">
+  <link rel="stylesheet" href="css/styles.css?v=1.9.1">
   <script src="vendor/vue.global.prod.js"></script>
   <script src="vendor/pdf-lib.min.js"></script>
 </head>
@@ -37,7 +37,7 @@
             <path d="M20 15.2A8 8 0 0 1 8.8 4 8 8 0 1 0 20 15.2Z"></path>
           </svg>
         </button>
-        <button class="version-btn" type="button" @click="showChangelog = true">v1.9.0</button>
+        <button class="version-btn" type="button" @click="showChangelog = true">v1.9.1</button>
       </div>
     </header>
 
@@ -429,7 +429,23 @@
             {{ showBatchUnlockPassword ? '隱藏' : '顯示' }}
           </button>
         </div>
-        <p v-if="batchUnlockProgress" class="batch-unlock-progress" role="status">{{ batchUnlockProgress }}</p>
+        <div
+          v-if="isBatchUnlocking"
+          class="batch-unlock-progress"
+          role="progressbar"
+          aria-label="批次解密進度"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          :aria-valuenow="batchUnlockPercent"
+        >
+          <div class="batch-unlock-progress-head">
+            <span>{{ batchUnlockProgress }}</span>
+            <strong>{{ batchUnlockPercent }}%</strong>
+          </div>
+          <div class="batch-unlock-progress-track" aria-hidden="true">
+            <i :style="{ width: `${batchUnlockPercent}%` }"></i>
+          </div>
+        </div>
         <p v-if="batchUnlockError" class="unlock-error" role="alert">{{ batchUnlockError }}</p>
 
         <div class="unlock-actions">
@@ -503,6 +519,11 @@
             <h2 id="changelog-title">版本紀錄</h2>
           </div>
           <button class="modal-close" type="button" @click="showChangelog = false">關閉</button>
+        </div>
+        <div class="release-entry">
+          <strong>v1.9.1</strong>
+          <span>2026-07-30</span>
+          <p>修正批次解密期間畫面沒有即時重繪；新增逐份更新的百分比進度條。</p>
         </div>
         <div class="release-entry">
           <strong>v1.9.0</strong>
@@ -588,6 +609,6 @@
     </div>
   </div>
 
-  <script src="js/app.js?v=1.9.0"></script>
+  <script src="js/app.js?v=1.9.1"></script>
 </body>
 </html>

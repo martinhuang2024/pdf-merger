@@ -346,6 +346,8 @@
       const showBatchUnlockPassword = ref(false);
       const batchUnlockError = ref("");
       const batchUnlockProgress = ref("");
+      const batchUnlockCurrent = ref(0);
+      const batchUnlockTotal = ref(0);
       const previewUrl = ref("");
       const previewTitle = ref("");
       const previewPageCount = ref(0);
@@ -367,6 +369,11 @@
       const selectedLockedCount = computed(() => selectedLockedItems.value.length);
       const allLockedSelected = computed(() => (
         lockedCount.value > 0 && selectedLockedCount.value === lockedCount.value
+      ));
+      const batchUnlockPercent = computed(() => (
+        batchUnlockTotal.value
+          ? Math.round((batchUnlockCurrent.value / batchUnlockTotal.value) * 100)
+          : 0
       ));
       const isDarkMode = computed(() => theme.value === "dark");
 
@@ -648,6 +655,8 @@
         showBatchUnlockPassword.value = false;
         batchUnlockError.value = "";
         batchUnlockProgress.value = "";
+        batchUnlockCurrent.value = 0;
+        batchUnlockTotal.value = 0;
         nextTick(() => {
           if (batchUnlockPasswordInput.value) batchUnlockPasswordInput.value.focus();
         });
@@ -659,6 +668,8 @@
         batchUnlockPassword.value = "";
         batchUnlockError.value = "";
         batchUnlockProgress.value = "";
+        batchUnlockCurrent.value = 0;
+        batchUnlockTotal.value = 0;
       }
 
       async function unlockSelected() {
@@ -714,15 +725,23 @@
 
         isBatchUnlocking.value = true;
         batchUnlockError.value = "";
-        batchUnlockProgress.value = `正在處理 1 / ${targets.length}`;
+        batchUnlockCurrent.value = 0;
+        batchUnlockTotal.value = targets.length;
+        batchUnlockProgress.value = `準備解密 0 / ${targets.length}`;
         const password = batchUnlockPassword.value;
         let processedCount = 0;
         const results = await decryptPdfBatch(targets, password, async (bytes, knownPassword) => {
-          batchUnlockProgress.value = `正在處理 ${processedCount + 1} / ${targets.length}`;
+          batchUnlockProgress.value = `正在解密 ${processedCount + 1} / ${targets.length}`;
+          await nextTick();
+          await new Promise((resolve) => setTimeout(resolve, 0));
           try {
             return await decryptPdfBytes(bytes, knownPassword);
           } finally {
             processedCount += 1;
+            batchUnlockCurrent.value = processedCount;
+            batchUnlockProgress.value = `已完成 ${processedCount} / ${targets.length}`;
+            await nextTick();
+            await new Promise((resolve) => setTimeout(resolve, 0));
           }
         });
 
@@ -762,6 +781,8 @@
         selectedLockedIds.value = failedIds;
         isBatchUnlocking.value = false;
         batchUnlockProgress.value = "";
+        batchUnlockCurrent.value = 0;
+        batchUnlockTotal.value = 0;
 
         if (!failedIds.length) {
           const count = successful.size;
@@ -983,6 +1004,7 @@
         showUnlockPassword, unlockError, theme, isDarkMode, summary, lockedCount, hasLockedFiles,
         selectedLockedIds, batchUnlockOpen, batchUnlockPassword, batchUnlockPasswordInput,
         showBatchUnlockPassword, batchUnlockError, batchUnlockProgress,
+        batchUnlockCurrent, batchUnlockTotal, batchUnlockPercent,
         selectedLockedCount, selectedLockedItems, allLockedSelected,
         previewUrl, previewTitle, previewPageCount, previewContainer, previewLoading, previewError,
         formatBytes, openFilePicker, toggleTheme, openUnlockDialog, closeUnlockDialog, unlockSelected,
