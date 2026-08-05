@@ -36,6 +36,10 @@ GitHub Pages：https://martinhuang2024.github.io/pdf-merger/
 
 ## 版本
 
+### v1.9.2
+
+- 接受 QPDF「成功但有警告」的解密結果，避免結構略有異常的 PDF 被誤判為密碼錯誤。
+
 ### v1.9.1
 
 - 修正批次解密時進度狀態未即時顯示。

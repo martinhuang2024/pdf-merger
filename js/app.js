@@ -217,7 +217,7 @@
         inputPath,
         outputPath,
       ]);
-      if (exitCode && exitCode !== 0) {
+      if (exitCode !== 0 && exitCode !== 3) {
         throw new Error(qpdfErrors.join("\n") || `QPDF 結束代碼 ${exitCode}`);
       }
       const output = qpdf.FS.readFile(outputPath);

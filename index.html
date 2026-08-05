@@ -37,7 +37,7 @@
             <path d="M20 15.2A8 8 0 0 1 8.8 4 8 8 0 1 0 20 15.2Z"></path>
           </svg>
         </button>
-        <button class="version-btn" type="button" @click="showChangelog = true">v1.9.1</button>
+        <button class="version-btn" type="button" @click="showChangelog = true">v1.9.2</button>
       </div>
     </header>
 
@@ -521,6 +521,11 @@
           <button class="modal-close" type="button" @click="showChangelog = false">關閉</button>
         </div>
         <div class="release-entry">
+          <strong>v1.9.2</strong>
+          <span>2026-08-05</span>
+          <p>修正部分 PDF 已成功解密但帶有結構警告時，被誤判為密碼錯誤。</p>
+        </div>
+        <div class="release-entry">
           <strong>v1.9.1</strong>
           <span>2026-07-30</span>
           <p>修正批次解密期間畫面沒有即時重繪；新增逐份更新的百分比進度條。</p>
@@ -609,6 +614,6 @@
     </div>
   </div>
 
-  <script src="js/app.js?v=1.9.1"></script>
+  <script src="js/app.js?v=1.9.2"></script>
 </body>
 </html>
