@@ -6,7 +6,7 @@
   <meta name="description" content="在瀏覽器本機排序並合併 PDF 與圖片，檔案不會上傳。">
   <title>合頁 · PDF 合併工具</title>
   <script src="js/theme-init.js"></script>
-  <link rel="stylesheet" href="css/styles.css?v=1.9.1">
+  <link rel="stylesheet" href="css/styles.css?v=1.10.0">
   <script src="vendor/vue.global.prod.js"></script>
   <script src="vendor/pdf-lib.min.js"></script>
 </head>
@@ -37,7 +37,7 @@
             <path d="M20 15.2A8 8 0 0 1 8.8 4 8 8 0 1 0 20 15.2Z"></path>
           </svg>
         </button>
-        <button class="version-btn" type="button" @click="showChangelog = true">v1.9.2</button>
+        <button class="version-btn" type="button" @click="showChangelog = true">v1.10.0</button>
       </div>
     </header>
 
@@ -356,9 +356,11 @@
       <div class="modal preview-modal" role="dialog" aria-modal="true" aria-labelledby="preview-title">
         <div class="modal-header">
           <div>
-            <p class="section-label">PDF PREVIEW</p>
+            <p class="section-label">{{ previewItemId ? 'PDF PREVIEW / PAGE EDIT' : 'PDF PREVIEW' }}</p>
             <h2 id="preview-title">{{ previewTitle }}</h2>
-            <p class="preview-meta">{{ previewPageCount }} 頁 · 僅在本機預覽</p>
+            <p class="preview-meta">
+              {{ previewPageCount }} 頁 · 僅在本機預覽{{ previewItemId ? ' · 可刪除頁面' : '' }}
+            </p>
           </div>
           <div class="preview-header-actions">
             <a class="preview-open" :href="previewUrl" target="_blank" rel="noopener">另開視窗</a>
@@ -521,6 +523,11 @@
           <button class="modal-close" type="button" @click="showChangelog = false">關閉</button>
         </div>
         <div class="release-entry">
+          <strong>v1.10.0</strong>
+          <span>2026-08-05</span>
+          <p>單獨預覽檔案時可刪除指定頁面；刪除後立即更新頁數與後續合併內容。</p>
+        </div>
+        <div class="release-entry">
           <strong>v1.9.2</strong>
           <span>2026-08-05</span>
           <p>修正部分 PDF 已成功解密但帶有結構警告時，被誤判為密碼錯誤。</p>
@@ -614,6 +621,6 @@
     </div>
   </div>
 
-  <script src="js/app.js?v=1.9.2"></script>
+  <script src="js/app.js?v=1.10.0"></script>
 </body>
 </html>

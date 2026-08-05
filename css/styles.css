@@ -1524,6 +1524,53 @@ footer {
   line-height: 1;
 }
 
+.preview-page-delete {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 1;
+  display: inline-flex;
+  min-height: 31px;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  background: rgba(177, 45, 36, 0.92);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: background 150ms ease, transform 150ms ease;
+}
+
+.preview-page-delete:hover:not(:disabled) {
+  background: #8f211a;
+  transform: translateY(-1px);
+}
+
+.preview-page-delete:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 2px;
+}
+
+.preview-page-delete:disabled {
+  opacity: 0.48;
+  cursor: default;
+}
+
+.preview-page-delete svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+
 .preview-loading {
   position: absolute;
   inset: 0;
@@ -2023,6 +2070,11 @@ footer {
   .preview-pages {
     gap: 12px;
     padding: 10px;
+  }
+
+  .preview-page-delete {
+    min-height: 34px;
+    padding: 7px 9px;
   }
 
   .trust-strip {

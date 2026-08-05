@@ -27,6 +27,7 @@ const {
   decryptPdfBytes,
   decryptPdfBatch,
   mergePdfBuffers,
+  removePdfPage,
 } = require("../js/app.js");
 
 test.after(() => {
@@ -173,6 +174,30 @@ test("mergePdfBuffers can make every page portrait or keep mixed directions", as
   }
 });
 
+test("removePdfPage deletes the selected page and preserves the others", async () => {
+  const pdf = await global.PDFLib.PDFDocument.create();
+  pdf.addPage([300, 500]);
+  pdf.addPage([500, 300]);
+  pdf.addPage([400, 600]);
+  const result = await removePdfPage(await pdf.save(), 1);
+  const loaded = await global.PDFLib.PDFDocument.load(result.bytes);
+
+  assert.equal(result.pageCount, 2);
+  assert.equal(loaded.getPageCount(), 2);
+  assert.deepEqual(loaded.getPage(0).getSize(), { width: 300, height: 500 });
+  assert.deepEqual(loaded.getPage(1).getSize(), { width: 400, height: 600 });
+});
+
+test("removePdfPage keeps at least one page", async () => {
+  const pdf = await global.PDFLib.PDFDocument.create();
+  pdf.addPage();
+  const bytes = await pdf.save();
+  await assert.rejects(
+    () => removePdfPage(bytes, 0),
+    (error) => error && error.code === "PDF_PAGE_MINIMUM"
+  );
+});
+
 test("decryptPdfBytes removes a known PDF password", async () => {
   const plainPdf = await global.PDFLib.PDFDocument.create();
   plainPdf.addPage();
@@ -247,9 +272,9 @@ test("HTML follows the html-tools local asset structure", () => {
   assert.match(html, /js\/theme-init\.js/);
   assert.match(html, /css\/styles\.css/);
   assert.match(html, /js\/app\.js/);
-  assert.match(html, /class="version-btn"[\s\S]*?>v1\.9\.2</);
-  assert.match(html, /js\/app\.js\?v=1\.9\.2/);
-  assert.match(html, /css\/styles\.css\?v=1\.9\.1/);
+  assert.match(html, /class="version-btn"[\s\S]*?>v1\.10\.0</);
+  assert.match(html, /js\/app\.js\?v=1\.10\.0/);
+  assert.match(html, /css\/styles\.css\?v=1\.10\.0/);
   assert.match(html, /\.jpg,.jpeg,.png,.webp,.heic,.heif/);
   assert.match(html, /把 PDF 或圖片放到這裡/);
   assert.match(html, /item\.sourceType === 'image'/);
@@ -268,6 +293,7 @@ test("HTML follows the html-tools local asset structure", () => {
   assert.match(html, />\s*預覽\s*</);
   assert.match(html, /預覽合併結果/);
   assert.match(html, /ref="previewContainer"/);
+  assert.match(html, /previewItemId \? 'PDF PREVIEW \/ PAGE EDIT'/);
   assert.doesNotMatch(html, /<iframe/);
   assert.match(html, />\s*統一頁面方向\s*</);
   assert.match(html, /未勾選時保留原始直橫混合/);
