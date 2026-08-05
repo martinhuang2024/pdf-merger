@@ -6,7 +6,7 @@
   <meta name="description" content="在瀏覽器本機排序並合併 PDF 與圖片，檔案不會上傳。">
   <title>合頁 · PDF 合併工具</title>
   <script src="js/theme-init.js"></script>
-  <link rel="stylesheet" href="css/styles.css?v=1.10.0">
+  <link rel="stylesheet" href="css/styles.css?v=1.11.0">
   <script src="vendor/vue.global.prod.js"></script>
   <script src="vendor/pdf-lib.min.js"></script>
 </head>
@@ -37,7 +37,7 @@
             <path d="M20 15.2A8 8 0 0 1 8.8 4 8 8 0 1 0 20 15.2Z"></path>
           </svg>
         </button>
-        <button class="version-btn" type="button" @click="showChangelog = true">v1.10.0</button>
+        <button class="version-btn" type="button" @click="showChangelog = true">v1.11.0</button>
       </div>
     </header>
 
@@ -288,6 +288,31 @@
             </fieldset>
           </div>
 
+          <div class="sheet-layout-row">
+            <span class="sheet-layout-copy">
+              <strong>每張紙內容</strong>
+              <small>將多個原始頁面縮排到同一張 A4</small>
+            </span>
+            <fieldset class="sheet-layout-options">
+              <legend class="sr-only">選擇每張紙放置的頁數</legend>
+              <label>
+                <input v-model="pagesPerSheet" type="radio" :value="1">
+                <span class="nup-icon is-one" aria-hidden="true"><i></i></span>
+                1 頁
+              </label>
+              <label>
+                <input v-model="pagesPerSheet" type="radio" :value="2">
+                <span class="nup-icon is-two" aria-hidden="true"><i></i><i></i></span>
+                2 頁
+              </label>
+              <label>
+                <input v-model="pagesPerSheet" type="radio" :value="4">
+                <span class="nup-icon is-four" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+                4 頁
+              </label>
+            </fieldset>
+          </div>
+
           <div class="output-row">
             <label for="output-name">下載檔名</label>
             <div class="filename-field">
@@ -523,6 +548,11 @@
           <button class="modal-close" type="button" @click="showChangelog = false">關閉</button>
         </div>
         <div class="release-entry">
+          <strong>v1.11.0</strong>
+          <span>2026-08-06</span>
+          <p>新增每張紙放置 1、2 或 4 頁內容；2 頁左右排列，4 頁採 2×2 排列並等比例填滿。</p>
+        </div>
+        <div class="release-entry">
           <strong>v1.10.0</strong>
           <span>2026-08-05</span>
           <p>單獨預覽檔案時可刪除指定頁面；刪除後立即更新頁數與後續合併內容。</p>
@@ -621,6 +651,6 @@
     </div>
   </div>
 
-  <script src="js/app.js?v=1.10.0"></script>
+  <script src="js/app.js?v=1.11.0"></script>
 </body>
 </html>

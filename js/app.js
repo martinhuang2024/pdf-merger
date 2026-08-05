@@ -98,6 +98,16 @@
     };
   }
 
+  function getPagesPerSheetLayout(pagesPerSheet) {
+    if (Number(pagesPerSheet) === 2) {
+      return { pagesPerSheet: 2, columns: 2, rows: 1, width: 841.89, height: 595.28 };
+    }
+    if (Number(pagesPerSheet) === 4) {
+      return { pagesPerSheet: 4, columns: 2, rows: 2, width: 595.28, height: 841.89 };
+    }
+    return { pagesPerSheet: 1, columns: 1, rows: 1, width: 0, height: 0 };
+  }
+
   const assetPromises = new Map();
 
   function loadScriptOnce(src) {
@@ -281,10 +291,68 @@
         mergedPdf.addPage(page);
       });
     }
-    if (metadata && metadata.title) mergedPdf.setTitle(metadata.title);
-    mergedPdf.setProducer("HTML Tools / 合頁 PDF 工具");
-    mergedPdf.setCreator("HTML Tools / 合頁 PDF 工具");
-    return { bytes: await mergedPdf.save(), pageCount: mergedPdf.getPageCount() };
+    const sheetLayout = getPagesPerSheetLayout(metadata && metadata.pagesPerSheet);
+    let outputPdf = mergedPdf;
+    if (sheetLayout.pagesPerSheet > 1) {
+      outputPdf = await root.PDFLib.PDFDocument.create();
+      const sourcePages = mergedPdf.getPages();
+      const rotations = sourcePages.map((page) => (
+        ((Number(page.getRotation().angle) || 0) % 360 + 360) % 360
+      ));
+      sourcePages.forEach((page) => {
+        page.drawRectangle({ x: 0, y: 0, width: 0, height: 0, opacity: 0 });
+        page.setRotation(root.PDFLib.degrees(0));
+      });
+      const embeddedPages = await outputPdf.embedPages(sourcePages);
+      const margin = 12;
+      const gap = 10;
+      const usableWidth = sheetLayout.width - margin * 2 - gap * (sheetLayout.columns - 1);
+      const usableHeight = sheetLayout.height - margin * 2 - gap * (sheetLayout.rows - 1);
+      const slotWidth = usableWidth / sheetLayout.columns;
+      const slotHeight = usableHeight / sheetLayout.rows;
+
+      for (let start = 0; start < embeddedPages.length; start += sheetLayout.pagesPerSheet) {
+        const sheet = outputPdf.addPage([sheetLayout.width, sheetLayout.height]);
+        const group = embeddedPages.slice(start, start + sheetLayout.pagesPerSheet);
+        group.forEach((embeddedPage, groupIndex) => {
+          const sourceIndex = start + groupIndex;
+          const angle = rotations[sourceIndex];
+          const quarterTurn = angle % 180 !== 0;
+          const effectiveWidth = quarterTurn ? embeddedPage.height : embeddedPage.width;
+          const effectiveHeight = quarterTurn ? embeddedPage.width : embeddedPage.height;
+          const scale = Math.min(slotWidth / effectiveWidth, slotHeight / effectiveHeight);
+          const drawnWidth = embeddedPage.width * scale;
+          const drawnHeight = embeddedPage.height * scale;
+          const effectiveDrawnWidth = effectiveWidth * scale;
+          const effectiveDrawnHeight = effectiveHeight * scale;
+          const column = groupIndex % sheetLayout.columns;
+          const row = Math.floor(groupIndex / sheetLayout.columns);
+          const slotX = margin + column * (slotWidth + gap);
+          const slotY = sheetLayout.height - margin - (row + 1) * slotHeight - row * gap;
+          const targetX = slotX + (slotWidth - effectiveDrawnWidth) / 2;
+          const targetY = slotY + (slotHeight - effectiveDrawnHeight) / 2;
+          let drawX = targetX;
+          let drawY = targetY;
+          if (angle === 90) drawX += drawnHeight;
+          if (angle === 180) {
+            drawX += drawnWidth;
+            drawY += drawnHeight;
+          }
+          if (angle === 270) drawY += drawnWidth;
+          sheet.drawPage(embeddedPage, {
+            x: drawX,
+            y: drawY,
+            width: drawnWidth,
+            height: drawnHeight,
+            rotate: root.PDFLib.degrees(angle),
+          });
+        });
+      }
+    }
+    if (metadata && metadata.title) outputPdf.setTitle(metadata.title);
+    outputPdf.setProducer("HTML Tools / 合頁 PDF 工具");
+    outputPdf.setCreator("HTML Tools / 合頁 PDF 工具");
+    return { bytes: await outputPdf.save(), pageCount: outputPdf.getPageCount() };
   }
 
   async function removePdfPage(bytes, pageIndex) {
@@ -317,6 +385,7 @@
     isSupportedImageFile,
     isSupportedSourceFile,
     getImagePageLayout,
+    getPagesPerSheetLayout,
     readFileBuffer,
     decryptPdfBytes,
     decryptPdfBatch,
@@ -337,6 +406,7 @@
       const outputName = ref("合併文件");
       const normalizeOrientation = ref(false);
       const pageOrientation = ref("portrait");
+      const pagesPerSheet = ref(1);
       const dragActive = ref(false);
       const isReading = ref(false);
       const readProgress = ref({
@@ -980,6 +1050,7 @@
         return mergePdfBuffers(queue.value.map((item) => item.bytes), {
           title: sanitizeFilename(outputName.value),
           orientation: normalizeOrientation.value ? pageOrientation.value : null,
+          pagesPerSheet: pagesPerSheet.value,
         });
       }
 
@@ -1068,7 +1139,7 @@
       });
 
       return {
-        queue, fileInput, outputName, normalizeOrientation, pageOrientation,
+        queue, fileInput, outputName, normalizeOrientation, pageOrientation, pagesPerSheet,
         dragActive, isReading, readProgress, isBusy, isUnlocking, isBatchUnlocking, isPreviewing, draggedId,
         toastMessage, toastType, showChangelog, unlockTarget, unlockPassword, unlockPasswordInput,
         showUnlockPassword, unlockError, theme, isDarkMode, summary, lockedCount, hasLockedFiles,

@@ -1113,6 +1113,102 @@ main {
   height: 11px;
 }
 
+.sheet-layout-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 32px;
+  min-height: 102px;
+  border-bottom: 1px solid var(--line);
+}
+
+.sheet-layout-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sheet-layout-copy strong {
+  font-size: 13px;
+}
+
+.sheet-layout-copy small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.sheet-layout-options {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  min-width: 330px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+
+.sheet-layout-options label {
+  position: relative;
+  display: inline-flex;
+  min-height: 52px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 13px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
+}
+
+.sheet-layout-options label + label {
+  border-left: 1px solid var(--line);
+}
+
+.sheet-layout-options input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.sheet-layout-options label:has(input:checked) {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.sheet-layout-options label:has(input:focus-visible) {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: -3px;
+}
+
+.nup-icon {
+  display: grid;
+  width: 23px;
+  height: 17px;
+  grid-template-columns: 1fr;
+  gap: 2px;
+  padding: 2px;
+  border: 1.5px solid currentColor;
+}
+
+.nup-icon.is-two,
+.nup-icon.is-four {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.nup-icon.is-four {
+  grid-template-rows: repeat(2, 1fr);
+}
+
+.nup-icon i {
+  min-width: 0;
+  min-height: 0;
+  background: currentColor;
+  opacity: 0.48;
+}
+
 .output-row {
   display: grid;
   grid-template-columns: 150px 1fr;
@@ -2011,9 +2107,25 @@ footer {
     padding: 24px 0;
   }
 
+  .sheet-layout-row {
+    display: block;
+    padding: 24px 0;
+  }
+
   .orientation-options {
     width: 100%;
     margin-top: 18px;
+  }
+
+  .sheet-layout-options {
+    width: 100%;
+    min-width: 0;
+    margin-top: 18px;
+  }
+
+  .sheet-layout-options label {
+    min-height: 52px;
+    padding: 0 8px;
   }
 
   .output-row label {

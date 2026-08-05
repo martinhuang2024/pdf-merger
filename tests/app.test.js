@@ -23,6 +23,7 @@ const {
   isSupportedImageFile,
   isSupportedSourceFile,
   getImagePageLayout,
+  getPagesPerSheetLayout,
   readFileBuffer,
   decryptPdfBytes,
   decryptPdfBatch,
@@ -103,6 +104,18 @@ test("getImagePageLayout fits portrait and landscape images on matching A4 pages
   assert.ok(landscape.drawHeight <= landscape.pageHeight - 48);
 });
 
+test("getPagesPerSheetLayout returns 1-up, 2-up, and 4-up grids", () => {
+  assert.deepEqual(getPagesPerSheetLayout(1), {
+    pagesPerSheet: 1, columns: 1, rows: 1, width: 0, height: 0,
+  });
+  assert.deepEqual(getPagesPerSheetLayout(2), {
+    pagesPerSheet: 2, columns: 2, rows: 1, width: 841.89, height: 595.28,
+  });
+  assert.deepEqual(getPagesPerSheetLayout(4), {
+    pagesPerSheet: 4, columns: 2, rows: 2, width: 595.28, height: 841.89,
+  });
+});
+
 test("readFileBuffer uses the original direct arrayBuffer path", async () => {
   const source = new Uint8Array([1, 2, 3, 4]);
   const originalFileReader = global.FileReader;
@@ -172,6 +185,22 @@ test("mergePdfBuffers can make every page portrait or keep mixed directions", as
     const effectiveHeight = rotated ? width : height;
     assert.ok(effectiveWidth <= effectiveHeight);
   }
+});
+
+test("mergePdfBuffers arranges pages two-up and four-up on A4 sheets", async () => {
+  const source = await global.PDFLib.PDFDocument.create();
+  for (let index = 0; index < 5; index += 1) source.addPage([300, 500]);
+  const sourceBytes = await source.save();
+
+  const twoUp = await mergePdfBuffers([sourceBytes], { pagesPerSheet: 2 });
+  const twoUpPdf = await global.PDFLib.PDFDocument.load(twoUp.bytes);
+  assert.equal(twoUp.pageCount, 3);
+  assert.deepEqual(twoUpPdf.getPage(0).getSize(), { width: 841.89, height: 595.28 });
+
+  const fourUp = await mergePdfBuffers([sourceBytes], { pagesPerSheet: 4 });
+  const fourUpPdf = await global.PDFLib.PDFDocument.load(fourUp.bytes);
+  assert.equal(fourUp.pageCount, 2);
+  assert.deepEqual(fourUpPdf.getPage(0).getSize(), { width: 595.28, height: 841.89 });
 });
 
 test("removePdfPage deletes the selected page and preserves the others", async () => {
@@ -272,9 +301,9 @@ test("HTML follows the html-tools local asset structure", () => {
   assert.match(html, /js\/theme-init\.js/);
   assert.match(html, /css\/styles\.css/);
   assert.match(html, /js\/app\.js/);
-  assert.match(html, /class="version-btn"[\s\S]*?>v1\.10\.0</);
-  assert.match(html, /js\/app\.js\?v=1\.10\.0/);
-  assert.match(html, /css\/styles\.css\?v=1\.10\.0/);
+  assert.match(html, /class="version-btn"[\s\S]*?>v1\.11\.0</);
+  assert.match(html, /js\/app\.js\?v=1\.11\.0/);
+  assert.match(html, /css\/styles\.css\?v=1\.11\.0/);
   assert.match(html, /\.jpg,.jpeg,.png,.webp,.heic,.heif/);
   assert.match(html, /把 PDF 或圖片放到這裡/);
   assert.match(html, /item\.sourceType === 'image'/);
@@ -294,6 +323,8 @@ test("HTML follows the html-tools local asset structure", () => {
   assert.match(html, /預覽合併結果/);
   assert.match(html, /ref="previewContainer"/);
   assert.match(html, /previewItemId \? 'PDF PREVIEW \/ PAGE EDIT'/);
+  assert.match(html, /v-model="pagesPerSheet"/);
+  assert.match(html, />\s*每張紙內容\s*</);
   assert.doesNotMatch(html, /<iframe/);
   assert.match(html, />\s*統一頁面方向\s*</);
   assert.match(html, /未勾選時保留原始直橫混合/);
