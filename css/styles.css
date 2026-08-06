@@ -805,6 +805,72 @@ main {
   gap: 9px;
 }
 
+.file-repeat-toggle {
+  display: flex;
+  width: fit-content;
+  align-items: center;
+  gap: 7px;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 10px;
+  cursor: pointer;
+  transition: color 150ms ease, opacity 150ms ease;
+}
+
+.file-repeat-toggle:hover:not(.is-disabled) {
+  color: var(--ink);
+}
+
+.file-repeat-toggle.is-disabled {
+  opacity: 0.38;
+  cursor: default;
+}
+
+.file-repeat-toggle > input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.file-repeat-check {
+  display: grid;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--muted);
+  background: transparent;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+
+.file-repeat-check svg {
+  width: 10px;
+  fill: none;
+  stroke: var(--on-accent);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+  opacity: 0;
+  transform: scale(0.65);
+  transition: opacity 150ms ease, transform 150ms ease;
+}
+
+.file-repeat-toggle > input:checked + .file-repeat-check {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.file-repeat-toggle > input:checked + .file-repeat-check svg {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.file-repeat-toggle > input:focus-visible + .file-repeat-check {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
 .unlock-badge {
   padding: 2px 6px;
   border: 1px solid rgba(49, 94, 77, 0.35);
@@ -1137,6 +1203,13 @@ main {
   font-size: 11px;
 }
 
+.sheet-layout-controls {
+  display: flex;
+  width: 330px;
+  flex-direction: column;
+  gap: 9px;
+}
+
 .sheet-layout-options {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -1207,6 +1280,12 @@ main {
   min-height: 0;
   background: currentColor;
   opacity: 0.48;
+}
+
+.sheet-layout-hint {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
 }
 
 .output-row {
@@ -2120,6 +2199,10 @@ footer {
   .sheet-layout-options {
     width: 100%;
     min-width: 0;
+  }
+
+  .sheet-layout-controls {
+    width: 100%;
     margin-top: 18px;
   }
 

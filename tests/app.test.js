@@ -203,6 +203,31 @@ test("mergePdfBuffers arranges pages two-up and four-up on A4 sheets", async () 
   assert.deepEqual(fourUpPdf.getPage(0).getSize(), { width: 595.28, height: 841.89 });
 });
 
+test("mergePdfBuffers can repeat pages for selected source files only", async () => {
+  const repeatedSource = await global.PDFLib.PDFDocument.create();
+  repeatedSource.addPage([300, 500]);
+  repeatedSource.addPage([500, 300]);
+  const repeatedSourceBytes = await repeatedSource.save();
+
+  const normalSource = await global.PDFLib.PDFDocument.create();
+  normalSource.addPage([300, 500]);
+  normalSource.addPage([500, 300]);
+  normalSource.addPage([300, 500]);
+  const normalSourceBytes = await normalSource.save();
+
+  const repeatedTwoUp = await mergePdfBuffers([repeatedSourceBytes, normalSourceBytes], {
+    pagesPerSheet: 2,
+    repeatPagesToFillByBuffer: [true, false],
+  });
+  const repeatedFourUp = await mergePdfBuffers([repeatedSourceBytes, normalSourceBytes], {
+    pagesPerSheet: 4,
+    repeatPagesToFillByBuffer: [true, false],
+  });
+
+  assert.equal(repeatedTwoUp.pageCount, 4);
+  assert.equal(repeatedFourUp.pageCount, 3);
+});
+
 test("removePdfPage deletes the selected page and preserves the others", async () => {
   const pdf = await global.PDFLib.PDFDocument.create();
   pdf.addPage([300, 500]);
@@ -301,9 +326,9 @@ test("HTML follows the html-tools local asset structure", () => {
   assert.match(html, /js\/theme-init\.js/);
   assert.match(html, /css\/styles\.css/);
   assert.match(html, /js\/app\.js/);
-  assert.match(html, /class="version-btn"[\s\S]*?>v1\.11\.0</);
-  assert.match(html, /js\/app\.js\?v=1\.11\.0/);
-  assert.match(html, /css\/styles\.css\?v=1\.11\.0/);
+  assert.match(html, /class="version-btn"[\s\S]*?>v1\.12\.0</);
+  assert.match(html, /js\/app\.js\?v=1\.12\.0/);
+  assert.match(html, /css\/styles\.css\?v=1\.12\.0/);
   assert.match(html, /\.jpg,.jpeg,.png,.webp,.heic,.heif/);
   assert.match(html, /把 PDF 或圖片放到這裡/);
   assert.match(html, /item\.sourceType === 'image'/);
@@ -324,7 +349,9 @@ test("HTML follows the html-tools local asset structure", () => {
   assert.match(html, /ref="previewContainer"/);
   assert.match(html, /previewItemId \? 'PDF PREVIEW \/ PAGE EDIT'/);
   assert.match(html, /v-model="pagesPerSheet"/);
+  assert.match(html, /v-model="item\.repeatPagesToFill"/);
   assert.match(html, />\s*每張紙內容\s*</);
+  assert.match(html, /同頁重複填滿/);
   assert.doesNotMatch(html, /<iframe/);
   assert.match(html, />\s*統一頁面方向\s*</);
   assert.match(html, /未勾選時保留原始直橫混合/);

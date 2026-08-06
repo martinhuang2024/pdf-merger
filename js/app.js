@@ -272,7 +272,11 @@
     if (!root.PDFLib || !root.PDFLib.PDFDocument) throw new Error("PDF 引擎尚未載入");
 
     const mergedPdf = await root.PDFLib.PDFDocument.create();
-    for (const bytes of buffers) {
+    const repeatByPage = [];
+    const repeatByBuffer = metadata && Array.isArray(metadata.repeatPagesToFillByBuffer)
+      ? metadata.repeatPagesToFillByBuffer
+      : [];
+    for (const [bufferIndex, bytes] of buffers.entries()) {
       const sourcePdf = await root.PDFLib.PDFDocument.load(bytes, {
         ignoreEncryption: false,
         updateMetadata: false,
@@ -289,6 +293,7 @@
           )));
         }
         mergedPdf.addPage(page);
+        repeatByPage.push(Boolean(repeatByBuffer[bufferIndex]));
       });
     }
     const sheetLayout = getPagesPerSheetLayout(metadata && metadata.pagesPerSheet);
@@ -310,12 +315,34 @@
       const usableHeight = sheetLayout.height - margin * 2 - gap * (sheetLayout.rows - 1);
       const slotWidth = usableWidth / sheetLayout.columns;
       const slotHeight = usableHeight / sheetLayout.rows;
+      const pageGroups = [];
+      let pendingGroup = [];
+      embeddedPages.forEach((embeddedPage, sourceIndex) => {
+        if (repeatByPage[sourceIndex]) {
+          if (pendingGroup.length) {
+            pageGroups.push(pendingGroup);
+            pendingGroup = [];
+          }
+          pageGroups.push(
+            Array.from(
+              { length: sheetLayout.pagesPerSheet },
+              () => ({ embeddedPage, sourceIndex })
+            )
+          );
+          return;
+        }
 
-      for (let start = 0; start < embeddedPages.length; start += sheetLayout.pagesPerSheet) {
+        pendingGroup.push({ embeddedPage, sourceIndex });
+        if (pendingGroup.length === sheetLayout.pagesPerSheet) {
+          pageGroups.push(pendingGroup);
+          pendingGroup = [];
+        }
+      });
+      if (pendingGroup.length) pageGroups.push(pendingGroup);
+
+      for (const group of pageGroups) {
         const sheet = outputPdf.addPage([sheetLayout.width, sheetLayout.height]);
-        const group = embeddedPages.slice(start, start + sheetLayout.pagesPerSheet);
-        group.forEach((embeddedPage, groupIndex) => {
-          const sourceIndex = start + groupIndex;
+        group.forEach(({ embeddedPage, sourceIndex }, groupIndex) => {
           const angle = rotations[sourceIndex];
           const quarterTurn = angle % 180 !== 0;
           const effectiveWidth = quarterTurn ? embeddedPage.height : embeddedPage.width;
@@ -512,6 +539,7 @@
           locked,
           unlocked: false,
           sourceType: "pdf",
+          repeatPagesToFill: false,
         };
       }
 
@@ -589,6 +617,7 @@
           locked: false,
           unlocked: false,
           sourceType: "image",
+          repeatPagesToFill: false,
         };
       }
 
@@ -1051,6 +1080,7 @@
           title: sanitizeFilename(outputName.value),
           orientation: normalizeOrientation.value ? pageOrientation.value : null,
           pagesPerSheet: pagesPerSheet.value,
+          repeatPagesToFillByBuffer: queue.value.map((item) => item.repeatPagesToFill),
         });
       }
 
@@ -1139,7 +1169,8 @@
       });
 
       return {
-        queue, fileInput, outputName, normalizeOrientation, pageOrientation, pagesPerSheet,
+        queue, fileInput, outputName, normalizeOrientation, pageOrientation,
+        pagesPerSheet,
         dragActive, isReading, readProgress, isBusy, isUnlocking, isBatchUnlocking, isPreviewing, draggedId,
         toastMessage, toastType, showChangelog, unlockTarget, unlockPassword, unlockPasswordInput,
         showUnlockPassword, unlockError, theme, isDarkMode, summary, lockedCount, hasLockedFiles,

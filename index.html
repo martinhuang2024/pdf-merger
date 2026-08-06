@@ -6,7 +6,7 @@
   <meta name="description" content="在瀏覽器本機排序並合併 PDF 與圖片，檔案不會上傳。">
   <title>合頁 · PDF 合併工具</title>
   <script src="js/theme-init.js"></script>
-  <link rel="stylesheet" href="css/styles.css?v=1.11.0">
+  <link rel="stylesheet" href="css/styles.css?v=1.12.0">
   <script src="vendor/vue.global.prod.js"></script>
   <script src="vendor/pdf-lib.min.js"></script>
 </head>
@@ -37,7 +37,7 @@
             <path d="M20 15.2A8 8 0 0 1 8.8 4 8 8 0 1 0 20 15.2Z"></path>
           </svg>
         </button>
-        <button class="version-btn" type="button" @click="showChangelog = true">v1.11.0</button>
+        <button class="version-btn" type="button" @click="showChangelog = true">v1.12.0</button>
       </div>
     </header>
 
@@ -196,6 +196,21 @@
                   <em v-if="item.locked" class="locked-badge">已加密</em>
                   <em v-if="item.unlocked" class="unlock-badge">已去除密碼</em>
                 </span>
+                <label
+                  class="file-repeat-toggle"
+                  :class="{ 'is-disabled': pagesPerSheet === 1 || item.locked }"
+                  :title="pagesPerSheet === 1 ? '請先選擇每張 2 頁或 4 頁' : `讓此檔案的每一頁重複填滿 ${pagesPerSheet} 格`"
+                >
+                  <input
+                    v-model="item.repeatPagesToFill"
+                    type="checkbox"
+                    :disabled="pagesPerSheet === 1 || item.locked"
+                  >
+                  <span class="file-repeat-check" aria-hidden="true">
+                    <svg viewBox="0 0 16 16"><path d="m3 8 3 3 7-7"></path></svg>
+                  </span>
+                  同頁重複填滿 {{ pagesPerSheet === 1 ? '2／4 格' : `${pagesPerSheet} 格` }}
+                </label>
               </span>
               <span class="item-actions">
                 <label v-if="item.locked" class="batch-file-check">
@@ -293,24 +308,27 @@
               <strong>每張紙內容</strong>
               <small>將多個原始頁面縮排到同一張 A4</small>
             </span>
-            <fieldset class="sheet-layout-options">
-              <legend class="sr-only">選擇每張紙放置的頁數</legend>
-              <label>
-                <input v-model="pagesPerSheet" type="radio" :value="1">
-                <span class="nup-icon is-one" aria-hidden="true"><i></i></span>
-                1 頁
-              </label>
-              <label>
-                <input v-model="pagesPerSheet" type="radio" :value="2">
-                <span class="nup-icon is-two" aria-hidden="true"><i></i><i></i></span>
-                2 頁
-              </label>
-              <label>
-                <input v-model="pagesPerSheet" type="radio" :value="4">
-                <span class="nup-icon is-four" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
-                4 頁
-              </label>
-            </fieldset>
+            <div class="sheet-layout-controls">
+              <fieldset class="sheet-layout-options">
+                <legend class="sr-only">選擇每張紙放置的頁數</legend>
+                <label>
+                  <input v-model="pagesPerSheet" type="radio" :value="1">
+                  <span class="nup-icon is-one" aria-hidden="true"><i></i></span>
+                  1 頁
+                </label>
+                <label>
+                  <input v-model="pagesPerSheet" type="radio" :value="2">
+                  <span class="nup-icon is-two" aria-hidden="true"><i></i><i></i></span>
+                  2 頁
+                </label>
+                <label>
+                  <input v-model="pagesPerSheet" type="radio" :value="4">
+                  <span class="nup-icon is-four" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+                  4 頁
+                </label>
+              </fieldset>
+              <small class="sheet-layout-hint">選擇 2 頁或 4 頁後，可在各檔案下方個別開啟同頁重複。</small>
+            </div>
           </div>
 
           <div class="output-row">
@@ -548,6 +566,11 @@
           <button class="modal-close" type="button" @click="showChangelog = false">關閉</button>
         </div>
         <div class="release-entry">
+          <strong>v1.12.0</strong>
+          <span>2026-08-06</span>
+          <p>新增各檔案獨立的「同頁重複填滿」開關，可分別決定是否在 A4 重複 2 次或 4 次。</p>
+        </div>
+        <div class="release-entry">
           <strong>v1.11.0</strong>
           <span>2026-08-06</span>
           <p>新增每張紙放置 1、2 或 4 頁內容；2 頁左右排列，4 頁採 2×2 排列並等比例填滿。</p>
@@ -651,6 +674,6 @@
     </div>
   </div>
 
-  <script src="js/app.js?v=1.11.0"></script>
+  <script src="js/app.js?v=1.12.0"></script>
 </body>
 </html>
