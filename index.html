@@ -6,7 +6,7 @@
   <meta name="description" content="在瀏覽器本機排序並合併 PDF 與圖片，檔案不會上傳。">
   <title>合頁 · PDF 合併工具</title>
   <script src="js/theme-init.js"></script>
-  <link rel="stylesheet" href="css/styles.css?v=1.13.1">
+  <link rel="stylesheet" href="css/styles.css?v=1.14.0">
   <script src="vendor/vue.global.prod.js"></script>
   <script src="vendor/pdf-lib.min.js"></script>
 </head>
@@ -37,7 +37,7 @@
             <path d="M20 15.2A8 8 0 0 1 8.8 4 8 8 0 1 0 20 15.2Z"></path>
           </svg>
         </button>
-        <button class="version-btn" type="button" @click="showChangelog = true">v1.13.1</button>
+        <button class="version-btn" type="button" @click="showChangelog = true">v1.14.0</button>
       </div>
     </header>
 
@@ -331,6 +331,28 @@
             </div>
           </div>
 
+          <div class="compression-row">
+            <span class="compression-copy">
+              <strong>檔案壓縮</strong>
+              <small>{{ compressionHint }}</small>
+            </span>
+            <fieldset class="compression-options">
+              <legend class="sr-only">選擇 PDF 壓縮模式</legend>
+              <label>
+                <input v-model="compressionMode" type="radio" value="none">
+                原始
+              </label>
+              <label>
+                <input v-model="compressionMode" type="radio" value="lossless">
+                無損
+              </label>
+              <label>
+                <input v-model="compressionMode" type="radio" value="compact">
+                小檔案
+              </label>
+            </fieldset>
+          </div>
+
           <div class="output-row">
             <label for="output-name">下載檔名</label>
             <div class="filename-field">
@@ -361,14 +383,17 @@
               class="merge-button"
               type="button"
               :class="{ 'is-loading': isBusy }"
-              :disabled="isBusy || hasLockedFiles"
+              :disabled="isBusy || isPreviewing || hasLockedFiles"
               @click="mergeAndDownload"
             >
               <span class="merge-label">
                 {{ hasLockedFiles ? '請先去除密碼' : '合併並下載' }}
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0 4-4m-4 4-4-4M5 19h14"></path></svg>
               </span>
-              <span class="merge-progress"><span class="spinner"></span>正在合併…</span>
+              <span class="merge-progress">
+                <span class="spinner"></span>
+                {{ compressionMode === 'none' ? '正在合併…' : '正在合併與壓縮…' }}
+              </span>
             </button>
           </div>
         </div>
@@ -401,13 +426,25 @@
           <div>
             <p class="section-label">MERGE COMPLETE</p>
             <h2 id="merged-download-title">合併完成</h2>
-            <p class="preview-meta">{{ mergedDownloadName }} · {{ mergedDownloadPageCount }} 頁</p>
+            <p class="preview-meta">
+              {{ mergedDownloadName }} · {{ mergedDownloadPageCount }} 頁 · {{ mergedDownloadCompressionLabel }}
+            </p>
           </div>
           <button class="modal-close" type="button" @click="clearMergedDownload">關閉</button>
         </div>
         <p class="download-ready-copy">
           PDF 已在本機產生。請再按一次下載，讓 Safari 以直接使用者操作處理檔案，不會在合併完成後自動開啟 PDF 頁面。
         </p>
+        <div class="compression-result">
+          <span>輸出大小 <strong>{{ formatBytes(mergedDownloadSize) }}</strong></span>
+          <template v-if="mergedDownloadCompressionMode !== 'none'">
+            <span v-if="mergedDownloadSavedPercent > 0">
+              {{ formatBytes(mergedDownloadOriginalSize) }} → {{ formatBytes(mergedDownloadSize) }}
+              · 減少 {{ mergedDownloadSavedPercent }}%
+            </span>
+            <span v-else>原始合併結果已經很精簡，保留較小版本。</span>
+          </template>
+        </div>
         <div class="action-row">
           <a
             class="merge-button merged-download-button"
@@ -600,6 +637,11 @@
           <button class="modal-close" type="button" @click="showChangelog = false">關閉</button>
         </div>
         <div class="release-entry">
+          <strong>v1.14.0</strong>
+          <span>2026-10-05</span>
+          <p>新增 PDF 壓縮模式：原始、無損與小檔案；小檔案會重壓縮圖片，但保留文字搜尋與向量內容。</p>
+        </div>
+        <div class="release-entry">
           <strong>v1.13.1</strong>
           <span>2026-10-05</span>
           <p>修正 Safari／iPhone 合併完成後直接開啟 PDF；現在會先顯示明確的「下載 PDF」按鈕，再由使用者點擊下載。</p>
@@ -718,6 +760,6 @@
     </div>
   </div>
 
-  <script src="js/app.js?v=1.13.1"></script>
+  <script src="js/app.js?v=1.14.0"></script>
 </body>
 </html>
