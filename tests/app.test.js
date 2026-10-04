@@ -435,3 +435,19 @@ test("heavy preview and decryption engines load only when requested", () => {
   assert.match(source, /loadScriptOnce\("vendor\/qpdf-wasm-base64\.js\?v=1\.8\.0"\)/);
   assert.match(source, /loadScriptOnce\("vendor\/qpdf\.js\?v=1\.8\.0"\)/);
 });
+
+
+test("merged PDF waits for an explicit user download click", () => {
+  const source = fs.readFileSync(path.join(__dirname, "..", "js", "app.js"), "utf8");
+  const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
+  const start = source.indexOf("async function mergeAndDownload()");
+  const end = source.indexOf("onMounted(() =>", start);
+  const mergeBlock = source.slice(start, end);
+
+  assert.ok(start >= 0 && end > start);
+  assert.match(mergeBlock, /prepareMergedDownload\(result\.bytes, result\.pageCount\)/);
+  assert.doesNotMatch(mergeBlock, /link\.click\(\)/);
+  assert.match(html, /v-if="mergedDownloadUrl"/);
+  assert.match(html, /:download="mergedDownloadName"/);
+  assert.match(html, /下載 PDF/);
+});
