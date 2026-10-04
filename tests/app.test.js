@@ -29,6 +29,7 @@ const {
   decryptPdfBatch,
   mergePdfBuffers,
   removePdfPage,
+  keepOnlyPdfPage,
 } = require("../js/app.js");
 
 test.after(() => {
@@ -252,6 +253,29 @@ test("removePdfPage keeps at least one page", async () => {
   );
 });
 
+test("keepOnlyPdfPage keeps only the selected page", async () => {
+  const pdf = await global.PDFLib.PDFDocument.create();
+  pdf.addPage([300, 500]);
+  pdf.addPage([500, 300]);
+  pdf.addPage([400, 600]);
+  const result = await keepOnlyPdfPage(await pdf.save(), 1);
+  const loaded = await global.PDFLib.PDFDocument.load(result.bytes);
+
+  assert.equal(result.pageCount, 1);
+  assert.equal(loaded.getPageCount(), 1);
+  assert.deepEqual(loaded.getPage(0).getSize(), { width: 500, height: 300 });
+});
+
+test("keepOnlyPdfPage rejects an out-of-range page", async () => {
+  const pdf = await global.PDFLib.PDFDocument.create();
+  pdf.addPage();
+  const bytes = await pdf.save();
+  await assert.rejects(
+    () => keepOnlyPdfPage(bytes, 1),
+    RangeError
+  );
+});
+
 test("decryptPdfBytes removes a known PDF password", async () => {
   const plainPdf = await global.PDFLib.PDFDocument.create();
   plainPdf.addPage();
@@ -326,9 +350,9 @@ test("HTML follows the html-tools local asset structure", () => {
   assert.match(html, /js\/theme-init\.js/);
   assert.match(html, /css\/styles\.css/);
   assert.match(html, /js\/app\.js/);
-  assert.match(html, /class="version-btn"[\s\S]*?>v1\.12\.0</);
-  assert.match(html, /js\/app\.js\?v=1\.12\.0/);
-  assert.match(html, /css\/styles\.css\?v=1\.12\.0/);
+  assert.match(html, /class="version-btn"[\s\S]*?>v1\.13\.0</);
+  assert.match(html, /js\/app\.js\?v=1\.13\.0/);
+  assert.match(html, /css\/styles\.css\?v=1\.13\.0/);
   assert.match(html, /\.jpg,.jpeg,.png,.webp,.heic,.heif/);
   assert.match(html, /把 PDF 或圖片放到這裡/);
   assert.match(html, /item\.sourceType === 'image'/);
@@ -363,6 +387,14 @@ test("HTML follows the html-tools local asset structure", () => {
   );
   assert.doesNotMatch(html, /@drop\.prevent="handleDrop"/);
   assert.doesNotMatch(html, /https?:\/\//);
+});
+
+test("page preview exposes keep-only-page and delete-page actions", () => {
+  const source = fs.readFileSync(path.join(__dirname, "..", "js", "app.js"), "utf8");
+  assert.match(source, /僅留此頁/);
+  assert.match(source, /keepOnlyPreviewPage/);
+  assert.match(source, /preview-page-action preview-page-keep/);
+  assert.match(source, /preview-page-action preview-page-delete/);
 });
 
 test("whole page registers and removes external PDF drag listeners", () => {
