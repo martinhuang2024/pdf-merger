@@ -260,6 +260,74 @@
     return results;
   }
 
+  async function compressPdfBytes(bytes, mode) {
+    const selectedMode = mode || "none";
+    const sourceBytes = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+    if (selectedMode === "none") {
+      return {
+        bytes: sourceBytes,
+        mode: "none",
+        originalSize: sourceBytes.length,
+        outputSize: sourceBytes.length,
+        changed: false,
+      };
+    }
+    if (selectedMode !== "lossless" && selectedMode !== "compact") {
+      throw new Error(`不支援的 PDF 壓縮模式：${selectedMode}`);
+    }
+
+    const qpdf = await getQpdfModule();
+    const token = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+    const inputPath = `/compress_input_${token}.pdf`;
+    const outputPath = `/compress_output_${token}.pdf`;
+    qpdfOutput = [];
+    qpdfErrors = [];
+
+    try {
+      qpdf.FS.writeFile(inputPath, sourceBytes);
+      const args = [
+        inputPath,
+        "--object-streams=generate",
+        "--compress-streams=y",
+        "--recompress-flate",
+        "--compression-level=9",
+      ];
+      if (selectedMode === "compact") {
+        args.push(
+          "--optimize-images",
+          "--jpeg-quality=68",
+          "--oi-min-width=128",
+          "--oi-min-height=128"
+        );
+      }
+      args.push(outputPath);
+
+      const exitCode = qpdf.callMain(args);
+      if (exitCode !== 0 && exitCode !== 3) {
+        throw new Error(qpdfErrors.join("\n") || `QPDF 壓縮結束代碼 ${exitCode}`);
+      }
+
+      const compressed = new Uint8Array(qpdf.FS.readFile(outputPath));
+      const useCompressed = compressed.length < sourceBytes.length;
+      const outputBytes = useCompressed ? compressed : sourceBytes;
+      return {
+        bytes: outputBytes,
+        mode: selectedMode,
+        originalSize: sourceBytes.length,
+        outputSize: outputBytes.length,
+        changed: useCompressed,
+      };
+    } catch (cause) {
+      const error = new Error("PDF 壓縮失敗");
+      error.code = "PDF_COMPRESSION_FAILED";
+      error.cause = cause;
+      throw error;
+    } finally {
+      try { qpdf.FS.unlink(inputPath); } catch {}
+      try { qpdf.FS.unlink(outputPath); } catch {}
+    }
+  }
+
   function isEncryptedPdfError(error) {
     return Boolean(
       error &&
@@ -432,6 +500,7 @@
     readFileBuffer,
     decryptPdfBytes,
     decryptPdfBatch,
+    compressPdfBytes,
     isEncryptedPdfError,
     mergePdfBuffers,
     removePdfPage,
@@ -451,6 +520,7 @@
       const normalizeOrientation = ref(false);
       const pageOrientation = ref("portrait");
       const pagesPerSheet = ref(1);
+      const compressionMode = ref("none");
       const dragActive = ref(false);
       const isReading = ref(false);
       const readProgress = ref({
@@ -493,6 +563,9 @@
       const mergedDownloadUrl = ref("");
       const mergedDownloadName = ref("");
       const mergedDownloadPageCount = ref(0);
+      const mergedDownloadOriginalSize = ref(0);
+      const mergedDownloadSize = ref(0);
+      const mergedDownloadCompressionMode = ref("none");
       const theme = ref(
         document.documentElement.dataset.theme === "dark" ? "dark" : "light"
       );
@@ -515,6 +588,28 @@
           : 0
       ));
       const isDarkMode = computed(() => theme.value === "dark");
+      const compressionHint = computed(() => {
+        if (compressionMode.value === "lossless") {
+          return "壓縮 PDF 結構與 Flate 串流，不降低圖片品質。";
+        }
+        if (compressionMode.value === "compact") {
+          return "重壓縮圖片以縮小檔案；文字搜尋與向量內容仍保留。";
+        }
+        return "不額外壓縮，速度最快並完整保留原始品質。";
+      });
+      const mergedDownloadCompressionLabel = computed(() => {
+        if (mergedDownloadCompressionMode.value === "lossless") return "無損壓縮";
+        if (mergedDownloadCompressionMode.value === "compact") return "小檔案";
+        return "原始";
+      });
+      const mergedDownloadSavedPercent = computed(() => {
+        if (!mergedDownloadOriginalSize.value || mergedDownloadSize.value >= mergedDownloadOriginalSize.value) {
+          return 0;
+        }
+        return Math.round(
+          ((mergedDownloadOriginalSize.value - mergedDownloadSize.value) / mergedDownloadOriginalSize.value) * 100
+        );
+      });
 
       function showToast(message, type) {
         clearTimeout(toastTimer);
@@ -946,14 +1041,20 @@
         mergedDownloadUrl.value = "";
         mergedDownloadName.value = "";
         mergedDownloadPageCount.value = 0;
+        mergedDownloadOriginalSize.value = 0;
+        mergedDownloadSize.value = 0;
+        mergedDownloadCompressionMode.value = "none";
       }
 
-      function prepareMergedDownload(bytes, pageCount) {
+      function prepareMergedDownload(bytes, pageCount, originalSize, outputSize, mode) {
         clearMergedDownload();
         const blob = new Blob([bytes], { type: "application/pdf" });
         mergedDownloadUrl.value = URL.createObjectURL(blob);
         mergedDownloadName.value = `${sanitizeFilename(outputName.value)}.pdf`;
         mergedDownloadPageCount.value = pageCount;
+        mergedDownloadOriginalSize.value = Number(originalSize) || bytes.length || 0;
+        mergedDownloadSize.value = Number(outputSize) || bytes.length || 0;
+        mergedDownloadCompressionMode.value = mode || "none";
       }
 
       function markMergedDownloadStarted() {
@@ -1163,13 +1264,22 @@
         openPreview(item.bytes, item.file.name, item.pageCount, item.id);
       }
 
-      function createCurrentMerge() {
-        return mergePdfBuffers(queue.value.map((item) => item.bytes), {
+      async function createCurrentMerge() {
+        const merged = await mergePdfBuffers(queue.value.map((item) => item.bytes), {
           title: sanitizeFilename(outputName.value),
           orientation: normalizeOrientation.value ? pageOrientation.value : null,
           pagesPerSheet: pagesPerSheet.value,
           repeatPagesToFillByBuffer: queue.value.map((item) => item.repeatPagesToFill),
         });
+        const compressed = await compressPdfBytes(merged.bytes, compressionMode.value);
+        return {
+          ...merged,
+          bytes: compressed.bytes,
+          originalSize: compressed.originalSize,
+          outputSize: compressed.outputSize,
+          compressionMode: compressed.mode,
+          compressionChanged: compressed.changed,
+        };
       }
 
       async function previewMerged() {
@@ -1221,8 +1331,20 @@
         isBusy.value = true;
         try {
           const result = await createCurrentMerge();
-          prepareMergedDownload(result.bytes, result.pageCount);
-          showToast(`合併完成，共 ${result.pageCount} 頁，請按下載 PDF。`, "success");
+          prepareMergedDownload(
+            result.bytes,
+            result.pageCount,
+            result.originalSize,
+            result.outputSize,
+            result.compressionMode
+          );
+          const saved = result.originalSize - result.outputSize;
+          const compressionMessage = result.compressionMode === "none"
+            ? ""
+            : saved > 0
+              ? `，已縮小 ${formatBytes(saved)}`
+              : "，原檔已經很精簡";
+          showToast(`合併完成，共 ${result.pageCount} 頁${compressionMessage}，請按下載 PDF。`, "success");
         } catch (error) {
           console.error(error);
           showToast("合併失敗，請移除加密或損毀的 PDF 後再試一次。", "error");
@@ -1251,7 +1373,7 @@
 
       return {
         queue, fileInput, outputName, normalizeOrientation, pageOrientation,
-        pagesPerSheet,
+        pagesPerSheet, compressionMode, compressionHint,
         dragActive, isReading, readProgress, isBusy, isUnlocking, isBatchUnlocking, isPreviewing, draggedId,
         toastMessage, toastType, showChangelog, unlockTarget, unlockPassword, unlockPasswordInput,
         showUnlockPassword, unlockError, theme, isDarkMode, summary, lockedCount, hasLockedFiles,
@@ -1261,6 +1383,8 @@
         selectedLockedCount, selectedLockedItems, allLockedSelected,
         previewUrl, previewTitle, previewPageCount, previewItemId, previewContainer, previewLoading, previewError,
         isEditingPage, mergedDownloadUrl, mergedDownloadName, mergedDownloadPageCount,
+        mergedDownloadOriginalSize, mergedDownloadSize, mergedDownloadCompressionMode,
+        mergedDownloadCompressionLabel, mergedDownloadSavedPercent,
         formatBytes, openFilePicker, toggleTheme, openUnlockDialog, closeUnlockDialog, unlockSelected,
         toggleAllLocked, openBatchUnlockDialog, closeBatchUnlockDialog, unlockSelectedBatch,
         handleFileInput, moveBy, removeFile, clearAll, downloadUnlocked,
