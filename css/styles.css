@@ -1591,6 +1591,19 @@ footer {
   cursor: pointer;
 }
 
+.download-ready-copy {
+  margin: 24px 0 0;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.merged-download-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
 .unlock-modal {
   width: min(520px, 100%);
   max-height: calc(100vh - 32px);
