@@ -6,7 +6,7 @@
   <meta name="description" content="在瀏覽器本機排序並合併 PDF 與圖片，檔案不會上傳。">
   <title>合頁 · PDF 合併工具</title>
   <script src="js/theme-init.js"></script>
-  <link rel="stylesheet" href="css/styles.css?v=1.13.0">
+  <link rel="stylesheet" href="css/styles.css?v=1.13.1">
   <script src="vendor/vue.global.prod.js"></script>
   <script src="vendor/pdf-lib.min.js"></script>
 </head>
@@ -37,7 +37,7 @@
             <path d="M20 15.2A8 8 0 0 1 8.8 4 8 8 0 1 0 20 15.2Z"></path>
           </svg>
         </button>
-        <button class="version-btn" type="button" @click="showChangelog = true">v1.13.0</button>
+        <button class="version-btn" type="button" @click="showChangelog = true">v1.13.1</button>
       </div>
     </header>
 
@@ -391,6 +391,40 @@
     </div>
 
     <div
+      v-if="mergedDownloadUrl"
+      class="overlay"
+      @click.self="clearMergedDownload"
+      @keydown.esc="clearMergedDownload"
+    >
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="merged-download-title">
+        <div class="modal-header">
+          <div>
+            <p class="section-label">MERGE COMPLETE</p>
+            <h2 id="merged-download-title">合併完成</h2>
+            <p class="preview-meta">{{ mergedDownloadName }} · {{ mergedDownloadPageCount }} 頁</p>
+          </div>
+          <button class="modal-close" type="button" @click="clearMergedDownload">關閉</button>
+        </div>
+        <p class="download-ready-copy">
+          PDF 已在本機產生。請再按一次下載，讓 Safari 以直接使用者操作處理檔案，不會在合併完成後自動開啟 PDF 頁面。
+        </p>
+        <div class="action-row">
+          <a
+            class="merge-button merged-download-button"
+            :href="mergedDownloadUrl"
+            :download="mergedDownloadName"
+            @click="markMergedDownloadStarted"
+          >
+            <span class="merge-label">
+              下載 PDF
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0 4-4m-4 4-4-4M5 19h14"></path></svg>
+            </span>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div
       v-if="previewUrl"
       class="overlay preview-overlay"
       @click.self="closePreview"
@@ -566,6 +600,11 @@
           <button class="modal-close" type="button" @click="showChangelog = false">關閉</button>
         </div>
         <div class="release-entry">
+          <strong>v1.13.1</strong>
+          <span>2026-10-05</span>
+          <p>修正 Safari／iPhone 合併完成後直接開啟 PDF；現在會先顯示明確的「下載 PDF」按鈕，再由使用者點擊下載。</p>
+        </div>
+        <div class="release-entry">
           <strong>v1.13.0</strong>
           <span>2026-10-04</span>
           <p>單檔預覽每一頁新增「僅留此頁」，確認後只保留指定頁並立即更新頁數與後續合併內容。</p>
@@ -679,6 +718,6 @@
     </div>
   </div>
 
-  <script src="js/app.js?v=1.13.0"></script>
+  <script src="js/app.js?v=1.13.1"></script>
 </body>
 </html>
