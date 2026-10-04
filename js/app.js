@@ -401,6 +401,22 @@
     return { bytes: await pdf.save(), pageCount: pdf.getPageCount() };
   }
 
+  async function keepOnlyPdfPage(bytes, pageIndex) {
+    if (!root.PDFLib || !root.PDFLib.PDFDocument) throw new Error("PDF 引擎尚未載入");
+    const pdf = await root.PDFLib.PDFDocument.load(bytes, {
+      ignoreEncryption: false,
+      updateMetadata: false,
+    });
+    const pageCount = pdf.getPageCount();
+    if (!Number.isInteger(pageIndex) || pageIndex < 0 || pageIndex >= pageCount) {
+      throw new RangeError("PDF 頁碼超出範圍");
+    }
+    for (let index = pageCount - 1; index >= 0; index -= 1) {
+      if (index !== pageIndex) pdf.removePage(index);
+    }
+    return { bytes: await pdf.save(), pageCount: 1 };
+  }
+
   const utils = {
     formatBytes,
     sanitizeFilename,
@@ -419,6 +435,7 @@
     isEncryptedPdfError,
     mergePdfBuffers,
     removePdfPage,
+    keepOnlyPdfPage,
   };
   if (typeof module !== "undefined" && module.exports) module.exports = utils;
   root.PdfMergerUtils = utils;
@@ -472,7 +489,7 @@
       const previewContainer = ref(null);
       const previewLoading = ref(false);
       const previewError = ref("");
-      const isDeletingPage = ref(false);
+      const isEditingPage = ref(false);
       const theme = ref(
         document.documentElement.dataset.theme === "dark" ? "dark" : "light"
       );
@@ -961,13 +978,13 @@
         previewItemId.value = "";
         previewLoading.value = false;
         previewError.value = "";
-        isDeletingPage.value = false;
+        isEditingPage.value = false;
       }
 
       async function deletePreviewPage(pageIndex) {
         const itemId = previewItemId.value;
         const item = queue.value.find((entry) => entry.id === itemId);
-        if (!item || isDeletingPage.value) return;
+        if (!item || isEditingPage.value) return;
         if (item.pageCount <= 1) {
           showToast("PDF 至少需要保留一頁。", "error");
           return;
@@ -975,9 +992,9 @@
         const pageNumber = pageIndex + 1;
         if (!root.confirm(`確定要從「${item.file.name}」刪除第 ${pageNumber} 頁嗎？`)) return;
 
-        isDeletingPage.value = true;
+        isEditingPage.value = true;
         const buttons = previewContainer.value
-          ? previewContainer.value.querySelectorAll(".preview-page-delete")
+          ? previewContainer.value.querySelectorAll(".preview-page-action")
           : [];
         buttons.forEach((button) => { button.disabled = true; });
         try {
@@ -991,9 +1008,43 @@
           showToast(`已刪除第 ${pageNumber} 頁，剩下 ${result.pageCount} 頁。`, "success");
         } catch (error) {
           console.error(error);
-          isDeletingPage.value = false;
+          isEditingPage.value = false;
           buttons.forEach((button) => { button.disabled = false; });
           showToast("刪除頁面失敗，請重新開啟預覽後再試一次。", "error");
+        }
+      }
+
+      async function keepOnlyPreviewPage(pageIndex) {
+        const itemId = previewItemId.value;
+        const item = queue.value.find((entry) => entry.id === itemId);
+        if (!item || isEditingPage.value) return;
+        if (item.pageCount <= 1) {
+          showToast("目前已只有一頁。", "info");
+          return;
+        }
+        const pageNumber = pageIndex + 1;
+        const removedCount = item.pageCount - 1;
+        if (!root.confirm(`確定只保留「${item.file.name}」的第 ${pageNumber} 頁嗎？其他 ${removedCount} 頁會刪除。`)) return;
+
+        isEditingPage.value = true;
+        const buttons = previewContainer.value
+          ? previewContainer.value.querySelectorAll(".preview-page-action")
+          : [];
+        buttons.forEach((button) => { button.disabled = true; });
+        try {
+          const result = await keepOnlyPdfPage(item.bytes, pageIndex);
+          queue.value = queue.value.map((entry) => (
+            entry.id === itemId
+              ? { ...entry, bytes: result.bytes, pageCount: result.pageCount }
+              : entry
+          ));
+          openPreview(result.bytes, item.file.name, result.pageCount, itemId);
+          showToast(`已僅保留第 ${pageNumber} 頁。`, "success");
+        } catch (error) {
+          console.error(error);
+          isEditingPage.value = false;
+          buttons.forEach((button) => { button.disabled = false; });
+          showToast("僅保留此頁失敗，請重新開啟預覽後再試一次。", "error");
         }
       }
 
@@ -1033,15 +1084,29 @@
             pageBadge.className = "preview-page-number";
             pageBadge.textContent = `${pageNumber} / ${pdf.numPages}`;
             if (editableItemId) {
+              const actionGroup = document.createElement("div");
+              actionGroup.className = "preview-page-actions";
+
+              const keepButton = document.createElement("button");
+              keepButton.className = "preview-page-action preview-page-keep";
+              keepButton.type = "button";
+              keepButton.disabled = pdf.numPages <= 1;
+              keepButton.setAttribute("aria-label", `僅保留第 ${pageNumber} 頁`);
+              keepButton.title = pdf.numPages <= 1 ? "目前已只有一頁" : `僅保留第 ${pageNumber} 頁`;
+              keepButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10v18H7z"></path><path d="M10 7h4M10 11h4M10 15h4"></path></svg><span>僅留此頁</span>';
+              keepButton.addEventListener("click", () => keepOnlyPreviewPage(pageNumber - 1));
+
               const deleteButton = document.createElement("button");
-              deleteButton.className = "preview-page-delete";
+              deleteButton.className = "preview-page-action preview-page-delete";
               deleteButton.type = "button";
               deleteButton.disabled = pdf.numPages <= 1;
               deleteButton.setAttribute("aria-label", `刪除第 ${pageNumber} 頁`);
               deleteButton.title = pdf.numPages <= 1 ? "PDF 至少需要保留一頁" : `刪除第 ${pageNumber} 頁`;
               deleteButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v5m4-5v5"></path></svg><span>刪除此頁</span>';
               deleteButton.addEventListener("click", () => deletePreviewPage(pageNumber - 1));
-              pageShell.appendChild(deleteButton);
+
+              actionGroup.append(keepButton, deleteButton);
+              pageShell.appendChild(actionGroup);
             }
             const canvas = document.createElement("canvas");
             canvas.setAttribute("aria-label", `第 ${pageNumber} 頁`);
@@ -1179,7 +1244,7 @@
         batchUnlockCurrent, batchUnlockTotal, batchUnlockPercent,
         selectedLockedCount, selectedLockedItems, allLockedSelected,
         previewUrl, previewTitle, previewPageCount, previewItemId, previewContainer, previewLoading, previewError,
-        isDeletingPage,
+        isEditingPage,
         formatBytes, openFilePicker, toggleTheme, openUnlockDialog, closeUnlockDialog, unlockSelected,
         toggleAllLocked, openBatchUnlockDialog, closeBatchUnlockDialog, unlockSelectedBatch,
         handleFileInput, moveBy, removeFile, clearAll, downloadUnlocked,
