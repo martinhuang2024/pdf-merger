@@ -490,6 +490,9 @@
       const previewLoading = ref(false);
       const previewError = ref("");
       const isEditingPage = ref(false);
+      const mergedDownloadUrl = ref("");
+      const mergedDownloadName = ref("");
+      const mergedDownloadPageCount = ref(0);
       const theme = ref(
         document.documentElement.dataset.theme === "dark" ? "dark" : "light"
       );
@@ -938,6 +941,26 @@
         });
       }
 
+      function clearMergedDownload() {
+        if (mergedDownloadUrl.value) URL.revokeObjectURL(mergedDownloadUrl.value);
+        mergedDownloadUrl.value = "";
+        mergedDownloadName.value = "";
+        mergedDownloadPageCount.value = 0;
+      }
+
+      function prepareMergedDownload(bytes, pageCount) {
+        clearMergedDownload();
+        const blob = new Blob([bytes], { type: "application/pdf" });
+        mergedDownloadUrl.value = URL.createObjectURL(blob);
+        mergedDownloadName.value = `${sanitizeFilename(outputName.value)}.pdf`;
+        mergedDownloadPageCount.value = pageCount;
+      }
+
+      function markMergedDownloadStarted() {
+        if (!mergedDownloadName.value) return;
+        showToast(`${mergedDownloadName.value} 已開始下載。`, "success");
+      }
+
       function downloadUnlocked(item) {
         const blob = new Blob([item.bytes], { type: "application/pdf" });
         const url = URL.createObjectURL(blob);
@@ -1198,16 +1221,8 @@
         isBusy.value = true;
         try {
           const result = await createCurrentMerge();
-          const blob = new Blob([result.bytes], { type: "application/pdf" });
-          const url = URL.createObjectURL(blob);
-          const link = document.createElement("a");
-          link.href = url;
-          link.download = `${sanitizeFilename(outputName.value)}.pdf`;
-          document.body.appendChild(link);
-          link.click();
-          link.remove();
-          setTimeout(() => URL.revokeObjectURL(url), 1000);
-          showToast(`合併完成，共 ${result.pageCount} 頁。`, "success");
+          prepareMergedDownload(result.bytes, result.pageCount);
+          showToast(`合併完成，共 ${result.pageCount} 頁，請按下載 PDF。`, "success");
         } catch (error) {
           console.error(error);
           showToast("合併失敗，請移除加密或損毀的 PDF 後再試一次。", "error");
@@ -1226,6 +1241,7 @@
 
       onBeforeUnmount(() => {
         closePreview();
+        clearMergedDownload();
         document.removeEventListener("dragenter", handlePageDragEnter);
         document.removeEventListener("dragover", handlePageDragOver);
         document.removeEventListener("dragleave", handlePageDragLeave);
@@ -1244,12 +1260,12 @@
         batchUnlockCurrent, batchUnlockTotal, batchUnlockPercent,
         selectedLockedCount, selectedLockedItems, allLockedSelected,
         previewUrl, previewTitle, previewPageCount, previewItemId, previewContainer, previewLoading, previewError,
-        isEditingPage,
+        isEditingPage, mergedDownloadUrl, mergedDownloadName, mergedDownloadPageCount,
         formatBytes, openFilePicker, toggleTheme, openUnlockDialog, closeUnlockDialog, unlockSelected,
         toggleAllLocked, openBatchUnlockDialog, closeBatchUnlockDialog, unlockSelectedBatch,
         handleFileInput, moveBy, removeFile, clearAll, downloadUnlocked,
         openPreview, closePreview, deletePreviewPage, previewItem, previewMerged, startDrag, endDrag,
-        dropAt, mergeAndDownload,
+        clearMergedDownload, markMergedDownloadStarted, dropAt, mergeAndDownload,
       };
     },
   }).mount("#app");
