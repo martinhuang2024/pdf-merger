@@ -27,6 +27,7 @@ const {
   readFileBuffer,
   decryptPdfBytes,
   decryptPdfBatch,
+  compressPdfBytes,
   mergePdfBuffers,
   removePdfPage,
   keepOnlyPdfPage,
@@ -445,9 +446,47 @@ test("merged PDF waits for an explicit user download click", () => {
   const mergeBlock = source.slice(start, end);
 
   assert.ok(start >= 0 && end > start);
-  assert.match(mergeBlock, /prepareMergedDownload\(result\.bytes, result\.pageCount\)/);
+  assert.match(mergeBlock, /prepareMergedDownload\([\s\S]*result\.compressionMode[\s\S]*\)/);
   assert.doesNotMatch(mergeBlock, /link\.click\(\)/);
   assert.match(html, /v-if="mergedDownloadUrl"/);
   assert.match(html, /:download="mergedDownloadName"/);
   assert.match(html, /下載 PDF/);
+});
+
+
+test("compressPdfBytes keeps original bytes when compression is disabled", async () => {
+  const source = new Uint8Array([1, 2, 3, 4]);
+  const result = await compressPdfBytes(source, "none");
+  assert.equal(result.mode, "none");
+  assert.equal(result.originalSize, 4);
+  assert.equal(result.outputSize, 4);
+  assert.equal(result.changed, false);
+  assert.deepEqual(Array.from(result.bytes), [1, 2, 3, 4]);
+});
+
+test("lossless and compact compression produce readable PDFs", async () => {
+  const pdf = await global.PDFLib.PDFDocument.create();
+  const page = pdf.addPage([595, 842]);
+  page.drawText("Compression regression test", { x: 72, y: 760, size: 18 });
+  const source = await pdf.save({ useObjectStreams: false });
+
+  for (const mode of ["lossless", "compact"]) {
+    const result = await compressPdfBytes(source, mode);
+    assert.equal(result.mode, mode);
+    assert.ok(result.outputSize <= result.originalSize);
+    const parsed = await global.PDFLib.PDFDocument.load(result.bytes);
+    assert.equal(parsed.getPageCount(), 1);
+  }
+});
+
+test("compression controls expose all three modes and preserve text/vector for compact mode", () => {
+  const source = fs.readFileSync(path.join(__dirname, "..", "js", "app.js"), "utf8");
+  const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
+  assert.match(html, /value="none"/);
+  assert.match(html, /value="lossless"/);
+  assert.match(html, /value="compact"/);
+  assert.match(source, /--object-streams=generate/);
+  assert.match(source, /--recompress-flate/);
+  assert.match(source, /--optimize-images/);
+  assert.match(source, /--jpeg-quality=68/);
 });
