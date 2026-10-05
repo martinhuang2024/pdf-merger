@@ -505,6 +505,6 @@ test("compression controls expose all four modes and target MB presets", () => {
   assert.match(source, /--object-streams=generate/);
   assert.match(source, /--recompress-flate/);
   assert.match(source, /--optimize-images/);
-  assert.match(source, /--jpeg-quality=68/);
+  assert.match(source, /appliedQuality = 68/);
   assert.match(source, /targetQualities = \[82, 72, 62, 52, 42, 34, 28, 22, 18, 14\]/);
 });
