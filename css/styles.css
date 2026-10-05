@@ -1314,10 +1314,17 @@ main {
   line-height: 1.55;
 }
 
+.compression-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+
 .compression-options {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  width: 330px;
+  grid-template-columns: repeat(4, 1fr);
+  width: 440px;
   margin: 0;
   padding: 0;
   overflow: hidden;
@@ -1357,6 +1364,75 @@ main {
 .compression-options label:has(input:focus-visible) {
   outline: 3px solid var(--focus-ring);
   outline-offset: -3px;
+}
+
+.compression-target {
+  display: grid;
+  grid-template-columns: auto 116px 1fr;
+  align-items: center;
+  gap: 8px;
+  width: 440px;
+}
+
+.compression-target > label {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.compression-target-input {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.compression-target-input input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  padding: 0 8px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+}
+
+.compression-target-input span {
+  padding-right: 9px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.compression-presets {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.compression-presets button {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  padding: 0 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.compression-presets button:hover,
+.compression-presets button:focus-visible {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.compression-warning {
+  color: var(--muted);
+  font-size: 11px;
 }
 
 .output-row {
@@ -2327,9 +2403,25 @@ footer {
     padding: 24px 0;
   }
 
+  .compression-controls {
+    width: 100%;
+    align-items: stretch;
+    margin-top: 18px;
+  }
+
   .compression-options {
     width: 100%;
-    margin-top: 18px;
+    margin-top: 0;
+  }
+
+  .compression-target {
+    grid-template-columns: auto 1fr;
+    width: 100%;
+  }
+
+  .compression-presets {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
   }
 
   .compression-options label {
