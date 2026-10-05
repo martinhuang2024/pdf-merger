@@ -479,14 +479,32 @@ test("lossless and compact compression produce readable PDFs", async () => {
   }
 });
 
-test("compression controls expose all three modes and preserve text/vector for compact mode", () => {
+test("target compression accepts MB goals and keeps already-small PDFs unchanged", async () => {
+  const pdf = await global.PDFLib.PDFDocument.create();
+  pdf.addPage([300, 300]);
+  const source = await pdf.save({ useObjectStreams: false });
+  const result = await compressPdfBytes(source, "target", 1);
+
+  assert.equal(result.mode, "target");
+  assert.equal(result.targetMb, 1);
+  assert.equal(result.targetReached, true);
+  assert.equal(result.changed, false);
+  assert.deepEqual(Array.from(result.bytes), Array.from(source));
+  await assert.rejects(() => compressPdfBytes(source, "target", 0), /目標 MB/);
+});
+
+test("compression controls expose all four modes and target MB presets", () => {
   const source = fs.readFileSync(path.join(__dirname, "..", "js", "app.js"), "utf8");
   const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
   assert.match(html, /value="none"/);
   assert.match(html, /value="lossless"/);
   assert.match(html, /value="compact"/);
+  assert.match(html, /value="target"/);
+  assert.match(html, /id="compression-target-mb"/);
+  assert.match(html, /\[1, 2, 5, 10, 20\]/);
   assert.match(source, /--object-streams=generate/);
   assert.match(source, /--recompress-flate/);
   assert.match(source, /--optimize-images/);
   assert.match(source, /--jpeg-quality=68/);
+  assert.match(source, /targetQualities = \[82, 72, 62, 52, 42, 34, 28, 22, 18, 14\]/);
 });
