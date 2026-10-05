@@ -355,6 +355,13 @@
     }
   }
 
+  function isEncryptedPdfError(error) {
+    return Boolean(
+      error &&
+      (error.name === "EncryptedPDFError" || /encrypted/i.test(String(error.message || "")))
+    );
+  }
+
 
   async function mergePdfBuffers(buffers, metadata) {
     if (!Array.isArray(buffers) || !buffers.length) throw new Error("至少需要一份 PDF");
