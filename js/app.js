@@ -280,20 +280,22 @@
     const qpdf = await getQpdfModule();
     const token = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
     const inputPath = `/compress_input_${token}.pdf`;
-    const outputPaths = [];
     try {
       qpdf.FS.writeFile(inputPath, sourceBytes);
       const runCompression = (quality, suffix) => {
         const outputPath = `/compress_output_${token}_${suffix}.pdf`;
-        outputPaths.push(outputPath);
         qpdfOutput = [];
         qpdfErrors = [];
         const args = [inputPath, "--object-streams=generate", "--compress-streams=y", "--recompress-flate", "--compression-level=9"];
         if (quality !== null) args.push("--optimize-images", `--jpeg-quality=${quality}`, "--oi-min-width=64", "--oi-min-height=64");
         args.push(outputPath);
-        const exitCode = qpdf.callMain(args);
-        if (exitCode !== 0 && exitCode !== 3) throw new Error(qpdfErrors.join("\n") || `QPDF 壓縮結束代碼 ${exitCode}`);
-        return new Uint8Array(qpdf.FS.readFile(outputPath));
+        try {
+          const exitCode = qpdf.callMain(args);
+          if (exitCode !== 0 && exitCode !== 3) throw new Error(qpdfErrors.join("\n") || `QPDF 壓縮結束代碼 ${exitCode}`);
+          return new Uint8Array(qpdf.FS.readFile(outputPath));
+        } finally {
+          try { qpdf.FS.unlink(outputPath); } catch {}
+        }
       };
 
       let compressed = sourceBytes;
@@ -304,12 +306,31 @@
         appliedQuality = 68;
         compressed = runCompression(appliedQuality, "compact");
       } else {
-        const targetQualities = [82, 72, 62, 52, 42, 34, 28, 22, 18, 14];
-        for (const quality of targetQualities) {
+        let lowQuality = 14;
+        let highQuality = 90;
+        let smallestCandidate = sourceBytes;
+        let smallestQuality = null;
+        let bestUnderTarget = null;
+        let bestUnderTargetQuality = null;
+        for (let attempt = 0; attempt < 7 && lowQuality <= highQuality; attempt += 1) {
+          const quality = Math.round((lowQuality + highQuality) / 2);
           const candidate = runCompression(quality, `target_${quality}`);
-          if (candidate.length < compressed.length) { compressed = candidate; appliedQuality = quality; }
-          if (compressed.length <= targetBytes) break;
+          if (candidate.length < smallestCandidate.length) {
+            smallestCandidate = candidate;
+            smallestQuality = quality;
+          }
+          if (candidate.length <= targetBytes) {
+            if (bestUnderTargetQuality === null || quality > bestUnderTargetQuality) {
+              bestUnderTarget = candidate;
+              bestUnderTargetQuality = quality;
+            }
+            lowQuality = quality + 1;
+          } else {
+            highQuality = quality - 1;
+          }
         }
+        compressed = bestUnderTarget || smallestCandidate;
+        appliedQuality = bestUnderTarget ? bestUnderTargetQuality : smallestQuality;
       }
 
       const useCompressed = compressed.length < sourceBytes.length;
@@ -331,7 +352,6 @@
       throw error;
     } finally {
       try { qpdf.FS.unlink(inputPath); } catch {}
-      outputPaths.forEach((outputPath) => { try { qpdf.FS.unlink(outputPath); } catch {} });
     }
   }
 
