@@ -506,5 +506,7 @@ test("compression controls expose all four modes and target MB presets", () => {
   assert.match(source, /--recompress-flate/);
   assert.match(source, /--optimize-images/);
   assert.match(source, /appliedQuality = 68/);
-  assert.match(source, /lowQuality = 14/);\n  assert.match(source, /highQuality = 90/);\n  assert.match(source, /attempt < 7/);
+  assert.match(source, /lowQuality = 14/);
+  assert.match(source, /highQuality = 90/);
+  assert.match(source, /attempt < 7/);
 });
