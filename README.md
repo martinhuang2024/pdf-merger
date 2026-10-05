@@ -34,7 +34,7 @@ GitHub Pages：https://martinhuang2024.github.io/pdf-merger/
 - PDF 預覽引擎：PDF.js（本機畫布渲染）
 - PDF 解鎖／壓縮引擎：QPDF WebAssembly（本地內嵌）
 - 小檔案模式：QPDF image optimization + JPEG quality 68；不將整份 PDF 點陣化
-- 目標 MB 模式：從 JPEG quality 82 逐級降低至 14，命中目標即停止；若 PDF 結構本身無法再縮小，回傳可取得的最小版本並提示未達標
+- 目標 MB 模式：在 JPEG quality 14–90 間最多進行 7 次二分搜尋，盡量以最高可用品質壓到目標；若 PDF 結構本身無法再縮小，回傳可取得的最小版本並提示未達標
 - 不依賴外部網路或建置工具
 
 ## 版本
@@ -42,7 +42,7 @@ GitHub Pages：https://martinhuang2024.github.io/pdf-merger/
 ### v1.15.0
 
 - 新增「目標 MB」壓縮，可快速選 1／2／5／10／20 MB 或自訂大小。
-- 依目標大小逐級降低圖片 JPEG 品質，達標即停止，並保留文字搜尋、向量與 PDF 結構。
+- 依目標大小在 JPEG quality 14–90 間最多搜尋 7 次，達標時優先保留較高品質，並保留文字搜尋、向量與 PDF 結構。
 - 若內容限制導致無法壓到指定大小，完成視窗會顯示實際大小與未達標提示。
 
 ### v1.14.0
