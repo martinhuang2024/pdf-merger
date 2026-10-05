@@ -6,7 +6,7 @@
   <meta name="description" content="在瀏覽器本機排序並合併 PDF 與圖片，檔案不會上傳。">
   <title>合頁 · PDF 合併工具</title>
   <script src="js/theme-init.js"></script>
-  <link rel="stylesheet" href="css/styles.css?v=1.14.0">
+  <link rel="stylesheet" href="css/styles.css?v=1.15.0">
   <script src="vendor/vue.global.prod.js"></script>
   <script src="vendor/pdf-lib.min.js"></script>
 </head>
@@ -37,7 +37,7 @@
             <path d="M20 15.2A8 8 0 0 1 8.8 4 8 8 0 1 0 20 15.2Z"></path>
           </svg>
         </button>
-        <button class="version-btn" type="button" @click="showChangelog = true">v1.14.0</button>
+        <button class="version-btn" type="button" @click="showChangelog = true">v1.15.0</button>
       </div>
     </header>
 
@@ -336,21 +336,47 @@
               <strong>檔案壓縮</strong>
               <small>{{ compressionHint }}</small>
             </span>
-            <fieldset class="compression-options">
-              <legend class="sr-only">選擇 PDF 壓縮模式</legend>
-              <label>
-                <input v-model="compressionMode" type="radio" value="none">
-                原始
-              </label>
-              <label>
-                <input v-model="compressionMode" type="radio" value="lossless">
-                無損
-              </label>
-              <label>
-                <input v-model="compressionMode" type="radio" value="compact">
-                小檔案
-              </label>
-            </fieldset>
+            <div class="compression-controls">
+              <fieldset class="compression-options">
+                <legend class="sr-only">選擇 PDF 壓縮模式</legend>
+                <label>
+                  <input v-model="compressionMode" type="radio" value="none">
+                  原始
+                </label>
+                <label>
+                  <input v-model="compressionMode" type="radio" value="lossless">
+                  無損
+                </label>
+                <label>
+                  <input v-model="compressionMode" type="radio" value="compact">
+                  小檔案
+                </label>
+                <label>
+                  <input v-model="compressionMode" type="radio" value="target">
+                  目標 MB
+                </label>
+              </fieldset>
+              <div v-if="compressionMode === 'target'" class="compression-target">
+                <label for="compression-target-mb">目標大小</label>
+                <div class="compression-target-input">
+                  <input
+                    id="compression-target-mb"
+                    v-model.number="compressionTargetMb"
+                    type="number"
+                    min="0.1"
+                    max="500"
+                    step="0.1"
+                    inputmode="decimal"
+                  >
+                  <span>MB</span>
+                </div>
+                <div class="compression-presets" aria-label="目標大小快速選擇">
+                  <button v-for="size in [1, 2, 5, 10, 20]" :key="size" type="button" @click="compressionTargetMb = size">
+                    {{ size }} MB
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div class="output-row">
@@ -443,6 +469,9 @@
               · 減少 {{ mergedDownloadSavedPercent }}%
             </span>
             <span v-else>原始合併結果已經很精簡，保留較小版本。</span>
+            <span v-if="mergedDownloadCompressionMode === 'target' && !mergedDownloadCompressionTargetReached" class="compression-warning">
+              目標 {{ mergedDownloadCompressionTargetMb }} MB 未能達成；此 PDF 已輸出目前可取得的較小版本。
+            </span>
           </template>
         </div>
         <div class="action-row">
@@ -637,6 +666,11 @@
           <button class="modal-close" type="button" @click="showChangelog = false">關閉</button>
         </div>
         <div class="release-entry">
+          <strong>v1.15.0</strong>
+          <span>2026-10-05</span>
+          <p>新增「目標 MB」壓縮：可快速選 1／2／5／10／20 MB 或自行輸入，程式會逐級降低圖片品質嘗試接近指定大小，無法達標時會明確提示實際輸出大小。</p>
+        </div>
+        <div class="release-entry">
           <strong>v1.14.0</strong>
           <span>2026-10-05</span>
           <p>新增 PDF 壓縮模式：原始、無損與小檔案；小檔案會重壓縮圖片，但保留文字搜尋與向量內容。</p>
@@ -760,6 +794,6 @@
     </div>
   </div>
 
-  <script src="js/app.js?v=1.14.0"></script>
+  <script src="js/app.js?v=1.15.0"></script>
 </body>
 </html>
